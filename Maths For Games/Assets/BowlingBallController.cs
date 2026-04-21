@@ -3,12 +3,13 @@ using UnityEngine.InputSystem;
 public class BowlingBallController : MonoBehaviour
 {
     [Header("Ball Variables")]
-    [SerializeField] private float ballHoldMoveSpeed = 2f;
-    [SerializeField] private float ballRollSpeed = 3f;
-    [SerializeField] private float ballRotateSpeed = 1f;
-    [SerializeField] private float ballChargeSpeed = 5f;
+    [Range(1, 3)][SerializeField] private float ballHoldMoveSpeed = 2f;
+    [Range(1, 5)][SerializeField] private float ballRollSpeed = 3f;
+    [Range(0, 3)][SerializeField] private float ballRotateSpeed = 1f;
+    [Range(1, 10)][SerializeField] private float ballChargeSpeed = 5f;
+    [Range(0, 1)][SerializeField] private float ballRadius = 0.5f;
 
-    [Header("Ball Constraits")]
+    [Header("Ball Constraints")]
     [SerializeField] private float laneWidth = 3f;
     [SerializeField] private float maxRotation = 25f;
     [SerializeField] private float resetDistance = 30f;
@@ -19,17 +20,21 @@ public class BowlingBallController : MonoBehaviour
     private float verticalVelocity = 0f;
     [SerializeField] private float gravityForce = -9.81f;
     [SerializeField] private float groundY = -2f;
+    [SerializeField] private float airResistance = 0.3f;
 
     private float elapsedRollingTime;
     private float yawDegrees;
     private float initalRollSpeed;
     private float throwCharge;
+    private float appliedThrowCharge;
 
     private bool thrownBall, isDraggingRight, isGrounded, isCharging;
 
     private Vector2 moveInput, rotateInput;
     private CustomMathsLibrary.Vector3 randomDragEndVector;
     private CustomMathsLibrary.Vector3 startPos;
+
+    private CustomMathsLibrary.Quat currentRotation = new CustomMathsLibrary.Quat(1, 0, 0, 0);
 
     private void Start()
     {
@@ -69,7 +74,7 @@ public class BowlingBallController : MonoBehaviour
 
             verticalVelocity = throwCharge;
 
-            float appliedCharge = throwCharge;
+            appliedThrowCharge = throwCharge;
             throwCharge = 0f;
 
             randomDragEndVector = new CustomMathsLibrary.Vector3(Random.Range(-0.2f, 0.2f), 0, Random.Range(-0.2f, 0.2f));
@@ -89,8 +94,11 @@ public class BowlingBallController : MonoBehaviour
             throwCharge = CustomMathsLibrary.Clamp(throwCharge, 0f, maxThrowForce);
         }
 
-        yawDegrees -= rotateInput.y * ballRotateSpeed;
-        yawDegrees = CustomMathsLibrary.Clamp(yawDegrees, -maxRotation, maxRotation);
+        if (!thrownBall)
+        {
+            yawDegrees -= rotateInput.y * ballRotateSpeed;
+            yawDegrees = CustomMathsLibrary.Clamp(yawDegrees, -maxRotation, maxRotation);
+        }
 
         float yawRadians = CustomMathsLibrary.DegreesToRadians(yawDegrees);
 
@@ -110,9 +118,14 @@ public class BowlingBallController : MonoBehaviour
         {
             elapsedRollingTime += Time.deltaTime;
 
-            CustomMathsLibrary.Vector3 randomDragVector = CustomMathsLibrary.LerpVector(CustomMathsLibrary.Vector3.zero, randomDragEndVector, elapsedRollingTime);
+            CustomMathsLibrary.Vector3 randomDragVector = CustomMathsLibrary.Scale(right, CustomMathsLibrary.LerpVector(CustomMathsLibrary.Vector3.zero, randomDragEndVector, elapsedRollingTime).x);
 
-            moveDir = CustomMathsLibrary.Add(CustomMathsLibrary.Scale(forward, ballRollSpeed + throwCharge), randomDragVector);
+            moveDir = CustomMathsLibrary.Add(CustomMathsLibrary.Scale(forward, ballRollSpeed + appliedThrowCharge), randomDragVector);
+
+            if (CustomMathsLibrary.Dot(moveDir, forward) < 0)
+            {
+                moveDir = CustomMathsLibrary.Scale(forward, 0.1f);
+            }
 
             if (!isGrounded)
             {
@@ -140,7 +153,27 @@ public class BowlingBallController : MonoBehaviour
         CustomMathsLibrary.Vector3 ballVelocity = CustomMathsLibrary.Scale(moveDir, ballHoldMoveSpeed);
         pos = CustomMathsLibrary.Add(pos, CustomMathsLibrary.Scale(ballVelocity, Time.deltaTime));
 
-        transform.rotation = Quaternion.Euler(0f, yawDegrees, 0f);
+        if (thrownBall && ballRollSpeed > 0.01f)
+        {
+            CustomMathsLibrary.Vector3 direction = CustomMathsLibrary.Normalize(ballVelocity);
+
+            CustomMathsLibrary.Vector3 axis = CustomMathsLibrary.CrossProduct(up, direction);
+
+            float resistance = isGrounded ? 1f : airResistance;
+
+            float speed = CustomMathsLibrary.Magnitude(ballVelocity);
+            float angle = (speed / ballRadius) * Time.deltaTime * resistance;
+
+            CustomMathsLibrary.Quat deltaRotation = new CustomMathsLibrary.Quat(axis, angle);
+
+            currentRotation = deltaRotation * currentRotation;
+        }
+
+        CustomMathsLibrary.Quat yawRot = CustomMathsLibrary.Quat.Euler(0f, yawDegrees, 0f);
+
+        yawRot = yawRot * currentRotation;
+
+        transform.rotation = yawRot.ToUnityQuaternion();
 
         pos.x = CustomMathsLibrary.Clamp(pos.x, -laneWidth, laneWidth);
 
@@ -163,5 +196,7 @@ public class BowlingBallController : MonoBehaviour
         ballRollSpeed = initalRollSpeed;
         elapsedRollingTime = 0f;
         yawDegrees = 0f;
+
+        currentRotation = new CustomMathsLibrary.Quat(1, 0, 0, 0);
     }
 }

@@ -205,6 +205,31 @@ public static class CustomMathsLibrary
         {
             return new Quaternion(x, y, z, w);
         }
+
+        public static Quat Euler(float xDeg, float yDeg, float zDeg)
+        {
+            float xRad = CustomMathsLibrary.DegreesToRadians(xDeg);
+            float yRad = CustomMathsLibrary.DegreesToRadians(yDeg);
+            float zRad = CustomMathsLibrary.DegreesToRadians(zDeg);
+
+            float cx = Mathf.Cos(xRad * 0.5f);
+            float sx = Mathf.Sin(xRad * 0.5f);
+
+            float cy = Mathf.Cos(yRad * 0.5f);
+            float sy = Mathf.Sin(yRad * 0.5f);
+
+            float cz = Mathf.Cos(zRad * 0.5f);
+            float sz = Mathf.Sin(zRad * 0.5f);
+
+            Quat q = new Quat(0, 0, 0, 0);
+
+            q.w = (cx * cy * cz) + (sx * sy * sz);
+            q.x = (sx * cy * cz) - (cx * sy * sz);
+            q.y = (cx * sy * cz) + (sx * cy * sz);
+            q.z = (cx * cy * sz) - (sx * sy * cz);
+
+            return q;
+        }
     }
 
     // ------ VECTOR2 MATH ------ // 
