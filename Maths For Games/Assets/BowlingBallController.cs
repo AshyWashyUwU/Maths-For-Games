@@ -31,8 +31,11 @@ public class BowlingBallController : MonoBehaviour
     private bool thrownBall, isDraggingRight, isGrounded, isCharging;
 
     private Vector2 moveInput, rotateInput;
+
     private CustomMathsLibrary.Vector3 randomDragEndVector;
     private CustomMathsLibrary.Vector3 startPos;
+
+    private CustomMathsLibrary.Vector3 up = new CustomMathsLibrary.Vector3(0, 1, 0);
 
     private CustomMathsLibrary.Quat currentRotation = new CustomMathsLibrary.Quat(1, 0, 0, 0);
 
@@ -83,11 +86,6 @@ public class BowlingBallController : MonoBehaviour
 
     private void FixedUpdate()
     {
-        MoveBall();
-    }
-
-    private void MoveBall()
-    {
         if (isCharging)
         {
             throwCharge += ballChargeSpeed * Time.deltaTime;
@@ -100,89 +98,110 @@ public class BowlingBallController : MonoBehaviour
             yawDegrees = CustomMathsLibrary.Clamp(yawDegrees, -maxRotation, maxRotation);
         }
 
+        CustomMathsLibrary.Vector3 pos = transform.position;
+
+        CustomMathsLibrary.Vector3 moveDir = GetMoveDir();
+        pos = GetMovement(pos, moveDir);
+
+        ApplyPhysics(pos, moveDir);
+        ApplyRotation(moveDir);
+
+        ApplyConstraints(pos);
+        ApplyTransform(pos);
+
+        if (pos.z >= resetDistance) ResetBall();
+    }
+
+    private CustomMathsLibrary.Vector3 GetMoveDir()
+    {
+        if (!thrownBall)
+        {
+            return new CustomMathsLibrary.Vector3(moveInput.x, 0f, 0f);
+        }
+
         float yawRadians = CustomMathsLibrary.DegreesToRadians(yawDegrees);
 
         CustomMathsLibrary.Vector3 forward = CustomMathsLibrary.ForwardFromYawPitch(yawRadians, 0);
-        CustomMathsLibrary.Vector3 up = new CustomMathsLibrary.Vector3(0, 1, 0);
         CustomMathsLibrary.Vector3 right = CustomMathsLibrary.CrossProduct(up, forward);
 
-        CustomMathsLibrary.Vector3 moveDir = new Vector3(0f, 0f, 0f);
+        elapsedRollingTime += Time.deltaTime;
 
-        CustomMathsLibrary.Vector3 pos = transform.position;
+        CustomMathsLibrary.Vector3 randomDragVector = CustomMathsLibrary.Scale(right, CustomMathsLibrary.LerpVector(CustomMathsLibrary.Vector3.zero, randomDragEndVector, elapsedRollingTime).x);
+        CustomMathsLibrary.Vector3 moveDir = CustomMathsLibrary.Add(CustomMathsLibrary.Scale(forward, ballRollSpeed + appliedThrowCharge), randomDragVector);
 
-        if (!thrownBall)
+        return moveDir;
+    }
+
+    private CustomMathsLibrary.Vector3 GetMovement(CustomMathsLibrary.Vector3 pos, CustomMathsLibrary.Vector3 moveDir)
+    {
+        CustomMathsLibrary.Vector3 velocity = CustomMathsLibrary.Scale(moveDir, ballHoldMoveSpeed);
+
+        return CustomMathsLibrary.Add(pos, CustomMathsLibrary.Scale(velocity, Time.deltaTime));
+    }
+
+    private void ApplyPhysics(CustomMathsLibrary.Vector3 pos, CustomMathsLibrary.Vector3 moveDir)
+    {
+        if (!thrownBall) return;
+
+        if (!isGrounded)
         {
-            moveDir = new CustomMathsLibrary.Vector3(moveInput.x, 0f, 0f);
+            verticalVelocity += gravityForce * Time.deltaTime;
+            pos.y += verticalVelocity * Time.deltaTime;
+
+            if (pos.y <= groundY)
+            {
+                pos.y = groundY;
+                verticalVelocity = 0f;
+                isGrounded = true;
+            }
         }
         else
         {
-            elapsedRollingTime += Time.deltaTime;
+            ballRollSpeed *= 0.995f;
 
-            CustomMathsLibrary.Vector3 randomDragVector = CustomMathsLibrary.Scale(right, CustomMathsLibrary.LerpVector(CustomMathsLibrary.Vector3.zero, randomDragEndVector, elapsedRollingTime).x);
-
-            moveDir = CustomMathsLibrary.Add(CustomMathsLibrary.Scale(forward, ballRollSpeed + appliedThrowCharge), randomDragVector);
-
-            if (CustomMathsLibrary.Dot(moveDir, forward) < 0)
-            {
-                moveDir = CustomMathsLibrary.Scale(forward, 0.1f);
-            }
-
-            if (!isGrounded)
-            {
-                verticalVelocity += gravityForce * Time.deltaTime;
-                pos.y += verticalVelocity * Time.deltaTime;
-
-                if (pos.y <= groundY)
-                {
-                    pos.y = groundY;
-                    verticalVelocity = 0f;
-                    isGrounded = true;
-                }
-            }
-            else
-            {
-                ballRollSpeed *= 0.995f;
-
-                if (ballRollSpeed < minRollSpeed)
-                {
-                    ballRollSpeed = minRollSpeed;
-                }
-            }
+            if (ballRollSpeed < minRollSpeed) ballRollSpeed = minRollSpeed;
         }
+    }
 
-        CustomMathsLibrary.Vector3 ballVelocity = CustomMathsLibrary.Scale(moveDir, ballHoldMoveSpeed);
-        pos = CustomMathsLibrary.Add(pos, CustomMathsLibrary.Scale(ballVelocity, Time.deltaTime));
-
-        if (thrownBall && ballRollSpeed > 0.01f)
-        {
-            CustomMathsLibrary.Vector3 direction = CustomMathsLibrary.Normalize(ballVelocity);
-
-            CustomMathsLibrary.Vector3 axis = CustomMathsLibrary.CrossProduct(up, direction);
-
-            float resistance = isGrounded ? 1f : airResistance;
-
-            float speed = CustomMathsLibrary.Magnitude(ballVelocity);
-            float angle = (speed / ballRadius) * Time.deltaTime * resistance;
-
-            CustomMathsLibrary.Quat deltaRotation = new CustomMathsLibrary.Quat(axis, angle);
-
-            currentRotation = deltaRotation * currentRotation;
-        }
-
-        CustomMathsLibrary.Quat yawRot = CustomMathsLibrary.Quat.Euler(0f, yawDegrees, 0f);
-
-        yawRot = yawRot * currentRotation;
-
-        transform.rotation = yawRot.ToUnityQuaternion();
-
+    private void ApplyConstraints(CustomMathsLibrary.Vector3 pos)
+    {
         pos.x = CustomMathsLibrary.Clamp(pos.x, -laneWidth, laneWidth);
+    }
 
-        transform.position = pos;
-
-        if (transform.position.z >= resetDistance)
+    private void CheckReset(CustomMathsLibrary.Vector3 pos)
+    {
+        if (pos.z >= resetDistance)
         {
             ResetBall();
         }
+    }
+
+    private void ApplyRotation(CustomMathsLibrary.Vector3 moveDir)
+    {
+        if (!thrownBall || ballRollSpeed <= 0.01f) return;
+
+        CustomMathsLibrary.Vector3 direction = CustomMathsLibrary.Normalize(moveDir);
+
+        CustomMathsLibrary.Vector3 axis = CustomMathsLibrary.CrossProduct(up, direction);
+
+        float resistance = isGrounded ? 1f : airResistance;
+        float speed = CustomMathsLibrary.Magnitude(moveDir);
+
+        float angle = (speed / ballRadius) * Time.deltaTime * resistance;
+
+        CustomMathsLibrary.Quat rotationQuat = new CustomMathsLibrary.Quat(axis, angle);
+
+        currentRotation = rotationQuat * currentRotation;
+    }
+
+    private void ApplyTransform(CustomMathsLibrary.Vector3 pos)
+    {
+        CustomMathsLibrary.Quat yawRot = CustomMathsLibrary.Quat.Euler(0f, yawDegrees, 0f);
+
+        CustomMathsLibrary.Quat finalRot = yawRot * currentRotation;
+
+        transform.rotation = finalRot.ToUnityQuaternion();
+        transform.position = pos;
     }
 
     private void ResetBall()

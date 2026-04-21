@@ -482,4 +482,11 @@ public static class CustomMathsLibrary
         if (value > max) return max;
         else return value;
     }
+
+    public static float Lerp(float a, float b, float t)
+    {
+        t = Clamp(t, 0, 1);
+
+        return a + (b - a) * t;
+    }
 }
