@@ -35,35 +35,35 @@ public class Cube : MonoBehaviour
     private void Update()
     {
         // 1) Update yaw/pitch (radians)
-        yawRad = yawRad + MFGCore.DegreesToRadians(yawSpeedDeg) * Time.deltaTime;
-        pitchRad = pitchRad + MFGCore.DegreesToRadians(pitchSpeedDeg) * Time.deltaTime;
+        yawRad = yawRad + CustomMathsLibrary.DegreesToRadians(yawSpeedDeg) * Time.deltaTime;
+        pitchRad = pitchRad + CustomMathsLibrary.DegreesToRadians(pitchSpeedDeg) * Time.deltaTime;
 
         // 2) Build forward from angles (your existing function from earlier weeks)
-        Vector3 F = MFGCore.ForwardFromYawPitch(yawRad, pitchRad);
+        Vector3 F = CustomMathsLibrary.ForwardFromYawPitch(yawRad, pitchRad);
 
         // 3) Translate our position along forward
-        P = MFGCore.Add(P, MFGCore.Scale(F, moveSpeed * Time.deltaTime));
+        P = CustomMathsLibrary.Add(P, CustomMathsLibrary.Scale(F, moveSpeed * Time.deltaTime));
 
         // 4) TODO: Make a function call to build basis from forward (R,U,F)
 
-        MFGCore.Vector3 r;
-        MFGCore.Vector3 u;
-        MFGCore.Vector3 f;
+        CustomMathsLibrary.Vector3 r;
+        CustomMathsLibrary.Vector3 u;
+        CustomMathsLibrary.Vector3 f;
 
-        MFGCore.BuildBasisFromForward(F, out r, out u, out f);
+        CustomMathsLibrary.BuildBasisFromForward(F, out r, out u, out f);
 
         // 5) TODO: Reassign R, U, and F to Bake non-uniform scale into basis BEFORE packing our 4x4 Matrix
-        r = MFGCore.NormalFromScale(r, nonUniformScale);
-        u = MFGCore.NormalFromScale(u, nonUniformScale);
-        f = MFGCore.NormalFromScale(f, nonUniformScale);
+        r = CustomMathsLibrary.NormalFromScale(r, nonUniformScale);
+        u = CustomMathsLibrary.NormalFromScale(u, nonUniformScale);
+        f = CustomMathsLibrary.NormalFromScale(f, nonUniformScale);
 
         // 6) TODO: Build Matrix4 from (R,U,F,P)
-        MFGCore.Matrix4 m = new MFGCore.Matrix4(r, u, f, P);
+        CustomMathsLibrary.Matrix4 m = new CustomMathsLibrary.Matrix4(r, u, f, P);
 
         for (int i = 0; i < originalVerts.Length; i++)
         {
             // TODO (B): Use your TransformPoint helper to transform deformedVerts[i]
-            deformedVerts[i] = MFGCore.TransformPoint(m, originalVerts[i]);
+            deformedVerts[i] = CustomMathsLibrary.TransformPoint(m, originalVerts[i]);
         }
 
         // 8) Apply back to mesh

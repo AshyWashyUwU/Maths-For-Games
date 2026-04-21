@@ -1,5 +1,5 @@
 using UnityEngine;
-public static class MFGCore
+public static class CustomMathsLibrary
 {
     public class Vector2
     {
@@ -135,6 +135,78 @@ public static class MFGCore
         }
     }
 
+    public class Quat
+    {
+        public float w;
+        public float x;
+        public float y;
+        public float z;
+
+        public Quat(float w, float x, float y, float z)
+        {
+            this.w = w;
+            this.x = x;
+            this.y = y;
+            this.z = z;
+        }
+
+        public Quat(Vector3 v)
+        {
+            this.w = 0;
+            this.x = v.x;
+            this.y = v.y;
+            this.z = v.z;
+        }
+
+        public Quat(Vector3 axis, float angleRad)
+        {
+            axis = Normalize(axis);
+
+            float halfAngle = angleRad * 0.5f;
+
+            w = Mathf.Cos(halfAngle);
+
+            x = axis.x * Mathf.Sin(halfAngle);
+
+            y = axis.y * Mathf.Sin(halfAngle);
+
+            z = axis.z * Mathf.Sin(halfAngle);
+        }
+
+        public static Quat operator *(Quat a, Quat b)
+        {
+            float wScaled = a.w * b.w - (a.x * b.x + a.y * b.y + a.z * b.z);
+
+            float xScaled = a.w * b.x + b.w * a.x + (a.y * b.z - a.z * b.y);
+
+            float yScaled = a.w * b.y + b.w * a.y + (a.z * b.x - a.x * b.z);
+
+            float zScaled = a.w * b.z + b.w * a.z + (a.x * b.y - a.y * b.x);
+
+            return new Quat(wScaled, xScaled, yScaled, zScaled);
+        }
+
+        public Quat Inverse()
+        {
+            return new Quat(w, -x, -y, -z);
+        }
+
+
+        public Vector3 RotateVector(Vector3 v)
+        {
+            Quat p = new Quat(v);
+
+            Quat P = this * p * this.Inverse();
+
+            return new Vector3(P.x, P.y, P.z);
+        }
+
+        public Quaternion ToUnityQuaternion()
+        {
+            return new Quaternion(x, y, z, w);
+        }
+    }
+
     // ------ VECTOR2 MATH ------ // 
 
     public static Vector2 Add(Vector2 a, Vector2 b)
@@ -235,6 +307,11 @@ public static class MFGCore
         }
     }
 
+    public static Vector3 LerpVector(Vector3 startPos, Vector3 endPos, float t)
+    {
+        return Add(startPos, Scale(Subtract(endPos, startPos), t));
+    }
+
     public static float Dot(Vector3 a, Vector3 b)
     {
         return (a.x * b.x) + (a.y * b.y) + (a.z * b.z);
@@ -295,25 +372,6 @@ public static class MFGCore
         Vector4 outV = M.Multiply(v);
 
         return new Vector3(outV.x, outV.y, outV.z);
-    }
-
-    public static Vector3 TransformDirection(Matrix4 M, Vector3 p)
-    {
-        Vector4 v = new Vector4(p.x, p.y, p.z, 0f);
-
-        Vector4 outV = M.Multiply(v);
-
-        return new Vector3(outV.x, outV.y, outV.z);
-    }
-
-    //scaling axis before translation
-    public static Matrix4 BuildTRS(Vector3 R, Vector3 U, Vector3 F, Vector3 P, Vector3 scale)
-    {
-        Vector3 Rs = Scale(R, scale.x);
-        Vector3 Us = Scale(U, scale.y);
-        Vector3 Fs = Scale(F, scale.z);
-
-        return new Matrix4(Rs, Us, Fs, P);
     }
 
     // ------ MATRIX MATH ------ // 
@@ -378,5 +436,25 @@ public static class MFGCore
 
         return f;
     }
-}
 
+    // ------ QUATERNATIONS ------
+
+    public static Vector3 RotateAroundAxis(Vector3 v, Vector3 axis, float angleRad)
+    {
+        axis = Normalize(axis);
+
+        float cosTheta = Mathf.Cos(angleRad);
+        float sinTheta = Mathf.Sin(angleRad);
+
+        return (Add(Add(Scale(v, cosTheta), Scale(Scale(axis, Dot(v, axis)), 1 - cosTheta)), Scale(CrossProduct(axis, v), sinTheta)));
+    }
+
+    // ------ MISC ------
+
+    public static float Clamp(float value, float min, float max)
+    {
+        if (value < min) return min;
+        if (value > max) return max;
+        else return value;
+    }
+}
