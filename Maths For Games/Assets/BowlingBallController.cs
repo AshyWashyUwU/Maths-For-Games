@@ -8,6 +8,9 @@ public class BowlingBallController : MonoBehaviour
     [Range(0, 3)][SerializeField] private float ballRotateSpeed = 1f;
     [Range(1, 10)][SerializeField] private float ballChargeSpeed = 5f;
     [Range(0, 1)][SerializeField] private float ballRadius = 0.5f;
+    [SerializeField] private float maxPullbackDistance = 0.25f;
+    [SerializeField] private float pullbackSmoothing = 5f;
+    [SerializeField] private float ballMass = 5f;
 
     [Header("Ball Constraints")]
     [SerializeField] private float laneWidth = 3f;
@@ -27,6 +30,7 @@ public class BowlingBallController : MonoBehaviour
     private float initalRollSpeed;
     private float throwCharge;
     private float appliedThrowCharge;
+    private float currentPullback;
 
     private bool thrownBall, isDraggingRight, isGrounded, isCharging;
 
@@ -75,13 +79,25 @@ public class BowlingBallController : MonoBehaviour
             thrownBall = true;
             isGrounded = false;
 
-            verticalVelocity = throwCharge;
+            verticalVelocity = (throwCharge * 0.5f) / ballMass;
+            appliedThrowCharge = throwCharge / ballMass;
 
-            appliedThrowCharge = throwCharge;
             throwCharge = 0f;
 
             randomDragEndVector = new CustomMathsLibrary.Vector3(Random.Range(-0.2f, 0.2f), 0, Random.Range(-0.2f, 0.2f));
         }
+    }
+
+    private CustomMathsLibrary.Vector3 ApplyChargeVisual(CustomMathsLibrary.Vector3 pos)
+    {
+        float chargePercent = throwCharge / maxThrowForce;
+        float targetPullback = -chargePercent * maxPullbackDistance;
+
+        currentPullback = CustomMathsLibrary.Lerp(currentPullback, targetPullback, pullbackSmoothing * Time.deltaTime);
+
+        CustomMathsLibrary.Vector3 offset = new CustomMathsLibrary.Vector3(0, 0, currentPullback);
+
+        return CustomMathsLibrary.Add(pos, offset);
     }
 
     private void FixedUpdate()
@@ -100,6 +116,8 @@ public class BowlingBallController : MonoBehaviour
 
         CustomMathsLibrary.Vector3 pos = transform.position;
 
+        pos = CustomMathsLibrary.Add(pos, new CustomMathsLibrary.Vector3(0, 0, -currentPullback));
+
         CustomMathsLibrary.Vector3 moveDir = GetMoveDir();
         pos = GetMovement(pos, moveDir);
 
@@ -107,6 +125,9 @@ public class BowlingBallController : MonoBehaviour
         ApplyRotation(moveDir);
 
         ApplyConstraints(pos);
+
+        if (isCharging) pos = ApplyChargeVisual(pos);
+
         ApplyTransform(pos);
 
         if (pos.z >= resetDistance) ResetBall();
@@ -127,7 +148,7 @@ public class BowlingBallController : MonoBehaviour
         elapsedRollingTime += Time.deltaTime;
 
         CustomMathsLibrary.Vector3 randomDragVector = CustomMathsLibrary.Scale(right, CustomMathsLibrary.LerpVector(CustomMathsLibrary.Vector3.zero, randomDragEndVector, elapsedRollingTime).x);
-        CustomMathsLibrary.Vector3 moveDir = CustomMathsLibrary.Add(CustomMathsLibrary.Scale(forward, ballRollSpeed + appliedThrowCharge), randomDragVector);
+        CustomMathsLibrary.Vector3 moveDir = CustomMathsLibrary.Add(CustomMathsLibrary.Scale(forward, ballRollSpeed + (appliedThrowCharge * 0.15f)), randomDragVector);
 
         return moveDir;
     }
@@ -145,7 +166,8 @@ public class BowlingBallController : MonoBehaviour
 
         if (!isGrounded)
         {
-            verticalVelocity += gravityForce * Time.deltaTime;
+            verticalVelocity += (gravityForce - (ballMass * 2.5f)) * Time.deltaTime;
+
             pos.y += verticalVelocity * Time.deltaTime;
 
             if (pos.y <= groundY)
@@ -154,9 +176,13 @@ public class BowlingBallController : MonoBehaviour
                 verticalVelocity = 0f;
                 isGrounded = true;
             }
+
+            appliedThrowCharge *= 1f / (1f - airResistance * 6f * Time.deltaTime);
         }
         else
         {
+            appliedThrowCharge *= 0.9f;
+
             ballRollSpeed *= 0.995f;
 
             if (ballRollSpeed < minRollSpeed) ballRollSpeed = minRollSpeed;
@@ -166,14 +192,6 @@ public class BowlingBallController : MonoBehaviour
     private void ApplyConstraints(CustomMathsLibrary.Vector3 pos)
     {
         pos.x = CustomMathsLibrary.Clamp(pos.x, -laneWidth, laneWidth);
-    }
-
-    private void CheckReset(CustomMathsLibrary.Vector3 pos)
-    {
-        if (pos.z >= resetDistance)
-        {
-            ResetBall();
-        }
     }
 
     private void ApplyRotation(CustomMathsLibrary.Vector3 moveDir)
@@ -215,6 +233,12 @@ public class BowlingBallController : MonoBehaviour
         ballRollSpeed = initalRollSpeed;
         elapsedRollingTime = 0f;
         yawDegrees = 0f;
+
+        throwCharge = 0f;
+        appliedThrowCharge = 0f;
+        currentPullback = 0f;
+
+        randomDragEndVector = CustomMathsLibrary.Vector3.zero;
 
         currentRotation = new CustomMathsLibrary.Quat(1, 0, 0, 0);
     }
