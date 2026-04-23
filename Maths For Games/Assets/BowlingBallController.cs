@@ -21,7 +21,7 @@ public class BowlingBallController : MonoBehaviour
     [Range(1, 10)]   [SerializeField] private float ballChargeSpeed = 3f; // How quickly the ball's charge fills when about to throw
     [Range(0.1f, 1)] [SerializeField] private float maxPullbackDistance = 0.25f; // How far the ball can (visually) be pulled back
     [Range(1, 10)]   [SerializeField] private float pullbackSmoothing = 5f; // For lerp / visual effect
-    [Range(0, 3)]    [SerializeField] private float maxThrowForce = 3; // The maximum force the ball can be thrown (affects speed later on)
+    [Range(0, 3)]    [SerializeField] private float maxThrowForce = 2; // The maximum force the ball can be thrown (affects speed later on)
 
     private float throwCharge; // The current charge of the ball
     private float appliedThrowCharge; // The throw charge force that is applied after release
@@ -30,7 +30,7 @@ public class BowlingBallController : MonoBehaviour
     // ------ Moving Variables ------ //
 
     [Header("Ball Moving Variables")]
-    [Range(0, 10f)]  [SerializeField] private float ballMass = 5f; // The "weight" of the ball which affects gravity force and drag
+    [Range(0, 10f)]  [SerializeField] private float ballMass = 8f; // The "weight" of the ball which affects gravity force and drag
     [Range(0, 1)]    [SerializeField] private float ballRadius = 0.5f; // The "size" of the ball which affects drag / rotation and how far away the ball is from the ground (TO DO)
     [Range(1, 5)]    [SerializeField] private float ballRollSpeed = 1.5f; // The ball's speed (based on forward)
     [Range(1, 5)]    [SerializeField] private float ballMinRollSpeed = 1.5f; // Prevents the ball from stopping entirely / going backwards (used to prevent softlock)
