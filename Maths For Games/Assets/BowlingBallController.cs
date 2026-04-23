@@ -50,6 +50,9 @@ public class BowlingBallController : MonoBehaviour
 
     private CustomMathsLibrary.Vector3 up = new CustomMathsLibrary.Vector3(0, 1, 0); // World up
 
+    [SerializeField] private BowlingPin[] pins;
+    [SerializeField] private float pinRadius = 0.25f;
+
     private void Start()
     {
         ResetBall();
@@ -165,7 +168,47 @@ public class BowlingBallController : MonoBehaviour
 
         ApplyTransform(pos);
 
+        CheckPinCollisions(pos, moveDir);
+
         if (pos.z >= resetDistance) ResetBall();
+    }
+
+    private void CheckPinCollisions(CustomMathsLibrary.Vector3 pos, CustomMathsLibrary.Vector3 moveDir)
+    {
+        foreach(BowlingPin pin in pins)
+        {
+            if (pin.isHit) continue;
+
+            CustomMathsLibrary.Vector3 pinPos = pin.transform.position;
+
+            float distance = CustomMathsLibrary.Distance(pos, pinPos);
+
+            float collisionDistance = ballRadius+ pinRadius;
+
+            if (distance <= collisionDistance)
+            {
+                ApplyHitToPin(pin, pos, pinPos, moveDir);
+            }
+
+            Debug.DrawLine(transform.position, pin.transform.position, Color.red);
+        }
+    }
+
+    private void ApplyHitToPin(BowlingPin pin, CustomMathsLibrary.Vector3 ballPos, CustomMathsLibrary.Vector3 pinPos, CustomMathsLibrary.Vector3 moveDir)
+    {
+        CustomMathsLibrary.Vector3 hitDir = CustomMathsLibrary.Subtract(pinPos, ballPos);
+        
+        hitDir.y = 0f;
+
+        hitDir = CustomMathsLibrary.Normalize(hitDir);
+        
+        float ballForce = appliedThrowCharge + ballRollSpeed;
+
+        CustomMathsLibrary.Vector3 forward = CustomMathsLibrary.Normalize(moveDir);
+
+        CustomMathsLibrary.Vector3 finalForce = CustomMathsLibrary.Add(CustomMathsLibrary.Scale(hitDir, 0.7f * ballForce), CustomMathsLibrary.Scale(forward, 0.3f * ballForce));
+
+        pin.ApplyHitForce(finalForce);
     }
 
     // Returns a charge force based on the ball's current position (pos) as an input
