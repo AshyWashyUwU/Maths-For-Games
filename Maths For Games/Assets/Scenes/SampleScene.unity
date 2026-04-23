@@ -478,21 +478,19 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BowlingBallController
   ballHoldMoveSpeed: 2
-  ballRollSpeed: 1.5
   ballRotateSpeed: 1
+  ballMaxRotation: 45
   ballChargeSpeed: 3
-  ballRadius: 0.5
   maxPullbackDistance: 0.25
   pullbackSmoothing: 5
-  ballMass: 10
-  laneWidth: 3
-  maxRotation: 25
-  resetDistance: 30
   maxThrowForce: 2
-  minRollSpeed: 1.5
-  gravityForce: -9.81
-  groundY: -2
-  airResistance: 0.3
+  ballMass: 8
+  ballRadius: 0.5
+  ballRollSpeed: 1.5
+  ballMinRollSpeed: 1.5
+  laneWidth: 3
+  resetDistance: 30
+  groundPos: -2
 --- !u!23 &859261032
 MeshRenderer:
   m_ObjectHideFlags: 0
