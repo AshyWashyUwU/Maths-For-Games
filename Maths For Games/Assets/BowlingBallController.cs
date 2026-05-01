@@ -44,14 +44,13 @@ public class BowlingBallController : MonoBehaviour
     // ------ Constraint Variables ------ //
 
     [Header("Ball Constraints")]
-    [Range(0, 5)]    [SerializeField] private float laneWidth = 3f; // Is used to decide how "big" the bowling ball lane is from each side (-3f <- -> 3f)
     [Range(5, 50)]   [SerializeField] private float resetDistance = 30f; // The maxiumum distance the ball can travel before being reset
-    [Range(0, -10)]  [SerializeField] private float groundPos = -2f; //The position of the "ground"
 
     private CustomMathsLibrary.Vector3 up = new CustomMathsLibrary.Vector3(0, 1, 0); // World up
 
+    // ------ Collision Variables ------ //
+
     [SerializeField] private BowlingPin[] pins;
-    [SerializeField] private float pinRadius = 0.25f;
 
     private void Start()
     {
@@ -166,49 +165,19 @@ public class BowlingBallController : MonoBehaviour
 
         if (isCharging) pos = ApplyChargeForce(pos);
 
+        foreach (BowlingPin pin in pins)
+        {
+            bool hit = pin.ApplyCollisionWithBall(pos, ballRadius, moveDir, appliedThrowCharge);
+
+            if (hit)
+            {
+                appliedThrowCharge *= 0.8f;
+            }
+        }
+
         ApplyTransform(pos);
 
-        CheckPinCollisions(pos, moveDir);
-
         if (pos.z >= resetDistance) ResetBall();
-    }
-
-    private void CheckPinCollisions(CustomMathsLibrary.Vector3 pos, CustomMathsLibrary.Vector3 moveDir)
-    {
-        foreach(BowlingPin pin in pins)
-        {
-            if (pin.isHit) continue;
-
-            CustomMathsLibrary.Vector3 pinPos = pin.transform.position;
-
-            float distance = CustomMathsLibrary.Distance(pos, pinPos);
-
-            float collisionDistance = ballRadius+ pinRadius;
-
-            if (distance <= collisionDistance)
-            {
-                ApplyHitToPin(pin, pos, pinPos, moveDir);
-            }
-
-            Debug.DrawLine(transform.position, pin.transform.position, Color.red);
-        }
-    }
-
-    private void ApplyHitToPin(BowlingPin pin, CustomMathsLibrary.Vector3 ballPos, CustomMathsLibrary.Vector3 pinPos, CustomMathsLibrary.Vector3 moveDir)
-    {
-        CustomMathsLibrary.Vector3 hitDir = CustomMathsLibrary.Subtract(pinPos, ballPos);
-        
-        hitDir.y = 0f;
-
-        hitDir = CustomMathsLibrary.Normalize(hitDir);
-        
-        float ballForce = appliedThrowCharge + ballRollSpeed;
-
-        CustomMathsLibrary.Vector3 forward = CustomMathsLibrary.Normalize(moveDir);
-
-        CustomMathsLibrary.Vector3 finalForce = CustomMathsLibrary.Add(CustomMathsLibrary.Scale(hitDir, 0.7f * ballForce), CustomMathsLibrary.Scale(forward, 0.3f * ballForce));
-
-        pin.ApplyHitForce(finalForce);
     }
 
     // Returns a charge force based on the ball's current position (pos) as an input
@@ -252,7 +221,7 @@ public class BowlingBallController : MonoBehaviour
         float hookStrength = hookSpeed * 0.25f;
 
         // Finds the closest side of the lane and changes the direction based on it
-        float closestSide = pos.x / laneWidth;
+        float closestSide = pos.x / WorldData.laneWidth;
 
         // POTENTAL FIX: only applies when the hookdirection != 0, returns Mathf.Sign(closest side (closestSide)) so a 0 or a 1
         if (hookDirection == 0) hookDirection = Mathf.Sign(closestSide);
@@ -289,10 +258,11 @@ public class BowlingBallController : MonoBehaviour
 
             pos.y += verticalVelocity * Time.deltaTime;
 
-            // Snaps the ball to the "ground" if the position (pos) is less than the ground position (groundPos)
-            if (pos.y <= groundPos)
+            float bottomPoint = pos.y - ballRadius;
+
+            if (bottomPoint <= WorldData.worldGroundPos)
             {
-                pos.y = groundPos;
+                pos.y = WorldData.worldGroundPos + ballRadius;
                 verticalVelocity = 0f;
                 isGrounded = true;
             }
@@ -329,7 +299,7 @@ public class BowlingBallController : MonoBehaviour
     // Constrains the ball from going off of the lane width's (laneWidth)
     private void ApplyConstraints(CustomMathsLibrary.Vector3 pos)
     {
-        pos.x = CustomMathsLibrary.Clamp(pos.x, -laneWidth, laneWidth);
+        pos.x = CustomMathsLibrary.Clamp(pos.x, -WorldData.laneWidth + ballRadius, WorldData.laneWidth - ballRadius);
     }
 
     // Applies the ball's rotation by using a Quat instead of euler angles

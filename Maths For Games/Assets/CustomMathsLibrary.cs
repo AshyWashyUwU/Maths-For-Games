@@ -408,6 +408,21 @@ public static class CustomMathsLibrary
         return Add(startPos, Scale(Subtract(endPos, startPos), t));
     }
 
+    public static Vector3 ClosestPointOnSegment(Vector3 a, Vector3 b, Vector3 p)
+    {
+        Vector3 ab = Subtract(b, a);
+        Vector3 ap = Subtract(p, a);
+
+        float ab2 = Dot(ab, ab);
+
+        if (ab2 == 0) return a;
+
+        float t = Dot(ap, ab) / ab2;
+        t = Clamp(t, 0f, 1f);
+
+        return Add(a, Scale(ab, t));
+    }
+
     // ------------------------------------ VECTOR4 MATH ------------------------------------ // 
 
     // Adds two Vector4s together
