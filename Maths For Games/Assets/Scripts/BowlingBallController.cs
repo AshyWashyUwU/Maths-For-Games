@@ -50,7 +50,8 @@ public class BowlingBallController : MonoBehaviour
 
     // ------ Collision Variables ------ //
 
-    [SerializeField] private BowlingPin[] pins;
+    [SerializeField] private BowlingPinController[] pins;
+
 
     private void Start()
     {
@@ -165,19 +166,35 @@ public class BowlingBallController : MonoBehaviour
 
         if (isCharging) pos = ApplyChargeForce(pos);
 
-        foreach (BowlingPin pin in pins)
-        {
-            bool hit = pin.ApplyCollisionWithBall(pos, ballRadius, moveDir, appliedThrowCharge);
-
-            if (hit)
-            {
-                appliedThrowCharge *= 0.8f;
-            }
-        }
+        HandlePinCollisions(ref pos, moveDir);
 
         ApplyTransform(pos);
 
         if (pos.z >= resetDistance) ResetBall();
+    }
+
+    private void HandlePinCollisions(ref CustomMathsLibrary.Vector3 ballPos, CustomMathsLibrary.Vector3 moveDir)
+    {
+        foreach (var pin in pins)
+        {
+            CustomMathsLibrary.Vector3 normal;
+            float penetration;
+
+            bool hit = CollisionUtility.SphereCapsuleCollision(ballPos, ballRadius, pin.GetBottom(), pin.GetTop(), pin.pinRadius, out normal, out penetration);
+            
+            if (!hit) continue;
+
+            ballPos = CustomMathsLibrary.Add(ballPos, CustomMathsLibrary.Scale(normal, penetration));
+
+            float speed = CustomMathsLibrary.Magnitude(moveDir);
+
+            CustomMathsLibrary.Vector3 impulse = CustomMathsLibrary.Scale(normal, speed * ballMass);
+
+            pin.ApplyImpulse(impulse);
+
+            appliedThrowCharge *= 0.7f;
+            ballRollSpeed *=0.85f;
+        }
     }
 
     // Returns a charge force based on the ball's current position (pos) as an input

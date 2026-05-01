@@ -2,74 +2,114 @@ using UnityEngine;
 
 public class BowlingPin : MonoBehaviour
 {
-    [SerializeField] private float pinRadius = 1f;
-    [SerializeField] private float pinHeight = 2f;
+    [Header("Pin Shape")]
+    [SerializeField] private float pinRadius = 0.2f;
+    [SerializeField] private float pinHeight = 1.5f;
 
-    private bool isGrounded;
+    [Header("Physics")]
+    [SerializeField] private float pinMass = 1f;
+    [SerializeField] private float damping = 0.98f;
+    [SerializeField] private float collisionCooldownTime = 0.02f;
 
     private CustomMathsLibrary.Vector3 pinVelocity = CustomMathsLibrary.Vector3.zero;
     private float verticalVelocity;
+    private bool isGrounded;
 
-    public bool ApplyCollisionWithBall(CustomMathsLibrary.Vector3 ballPos, float ballRadius, CustomMathsLibrary.Vector3 ballDir, float ballForce)
+    private float collisionCooldown;
+
+    public bool ApplyCollisionWithBall(
+        CustomMathsLibrary.Vector3 ballPos,
+        float ballRadius,
+        CustomMathsLibrary.Vector3 ballDir,
+        float ballForce,
+        out CustomMathsLibrary.Vector3 pushOut)
     {
-        CustomMathsLibrary.Vector3 A = transform.position;
-        CustomMathsLibrary.Vector3 B = CustomMathsLibrary.Add(A, new CustomMathsLibrary.Vector3(0, pinHeight, 0));
+        pushOut = CustomMathsLibrary.Vector3.zero;
 
-        CustomMathsLibrary.Vector3 closestPoint = CustomMathsLibrary.ClosestPointOnSegment(A, B, ballPos);
-        CustomMathsLibrary.Vector3 difference = CustomMathsLibrary.Subtract(ballPos, closestPoint);
+        CustomMathsLibrary.Vector3 A =
+            CustomMathsLibrary.Add(transform.position, new CustomMathsLibrary.Vector3(0, pinRadius, 0));
 
-        Debug.DrawLine(A, B, Color.red);
-        Debug.DrawLine(ballPos, closestPoint, Color.green);
+        CustomMathsLibrary.Vector3 B =
+            CustomMathsLibrary.Add(transform.position, new CustomMathsLibrary.Vector3(0, pinHeight - pinRadius, 0));
 
-        float distance = CustomMathsLibrary.Magnitude(difference);
-        float combinedRadius = ballRadius + pinRadius;
+        CustomMathsLibrary.Vector3 closest =
+            CustomMathsLibrary.ClosestPointOnSegment(A, B, ballPos);
 
-        if (distance <= combinedRadius)
+        CustomMathsLibrary.Vector3 diff =
+            CustomMathsLibrary.Subtract(ballPos, closest);
+
+        float dist = CustomMathsLibrary.Magnitude(diff);
+        float combined = ballRadius + pinRadius;
+
+        if (dist >= combined)
+            return false;
+
+        if (dist < 0.0001f)
         {
-            if (distance < 0.0001f)
-            {
-                difference = new CustomMathsLibrary.Vector3(0, 1, 0);
-                distance = 0.0001f;
-            }
-
-            CustomMathsLibrary.Vector3 normal = CustomMathsLibrary.Normalize(difference);
-
-            float penetration = combinedRadius - distance;
-
-            transform.position = CustomMathsLibrary.Add(transform.position, CustomMathsLibrary.Scale(normal, penetration + 0.01f));
-
-            float velIntoNormal = CustomMathsLibrary.Dot(pinVelocity, normal);
-
-            if (velIntoNormal < 0)
-            {
-                pinVelocity = CustomMathsLibrary.Subtract(normal, CustomMathsLibrary.Scale(normal, velIntoNormal));
-            }
-
-            CustomMathsLibrary.Vector3 impulse = CustomMathsLibrary.Add(CustomMathsLibrary.Scale(normal, 1f), CustomMathsLibrary.Scale(ballDir, 0.5f));
-
-            pinVelocity = CustomMathsLibrary.Add(pinVelocity, CustomMathsLibrary.Scale(impulse, ballForce * 1.5f));
-
-            return true;
+            diff = new CustomMathsLibrary.Vector3(0, 1, 0);
+            dist = 0.0001f;
         }
 
-        return false;
+        CustomMathsLibrary.Vector3 normal =
+            CustomMathsLibrary.Normalize(diff);
+
+        float penetration = (combined - dist) + 0.01f;
+
+        pushOut = CustomMathsLibrary.Scale(normal, penetration);
+
+        transform.position =
+            CustomMathsLibrary.Add(transform.position, pushOut);
+
+        float velIntoNormal = CustomMathsLibrary.Dot(pinVelocity, normal);
+
+        if (velIntoNormal < 0f)
+        {
+            pinVelocity = CustomMathsLibrary.Subtract(
+                pinVelocity,
+                CustomMathsLibrary.Scale(normal, velIntoNormal)
+            );
+        }
+
+        CustomMathsLibrary.Vector3 impulse =
+            CustomMathsLibrary.Scale(normal, ballForce / pinMass);
+
+        pinVelocity = CustomMathsLibrary.Add(pinVelocity, impulse);
+
+        pinVelocity = CustomMathsLibrary.Add(
+            pinVelocity,
+            CustomMathsLibrary.Scale(ballDir, ballForce * 0.3f)
+        );
+
+        collisionCooldown = collisionCooldownTime;
+
+        return true;
     }
 
     private void Update()
     {
+        float dt = Time.deltaTime;
+
+        if (collisionCooldown > 0f)
+            collisionCooldown -= dt;
+
         CustomMathsLibrary.Vector3 pos = transform.position;
 
         if (!isGrounded)
         {
-            verticalVelocity += CustomPhysicsLibrary.CaculateObjectGravityForce(1f) * Time.deltaTime;
+            verticalVelocity +=
+                CustomPhysicsLibrary.CaculateObjectGravityForce(pinMass) * dt;
         }
 
-        pos = CustomMathsLibrary.Add(pos, CustomMathsLibrary.Scale(pinVelocity, Time.deltaTime));
-        pos.y += verticalVelocity * Time.deltaTime;
+        pos = CustomMathsLibrary.Add(
+            pos,
+            CustomMathsLibrary.Scale(pinVelocity, dt)
+        );
 
-        float bottomPoint = pos.y - pinRadius;
+        pos.y += verticalVelocity * dt;
 
-        if (bottomPoint <= WorldData.worldGroundPos)
+        float bottom = pos.y - pinRadius;
+
+        if (bottom <= WorldData.worldGroundPos)
         {
             pos.y = WorldData.worldGroundPos + pinRadius;
             verticalVelocity = 0f;
@@ -80,7 +120,8 @@ public class BowlingPin : MonoBehaviour
             isGrounded = false;
         }
 
-        pinVelocity = CustomMathsLibrary.Scale(pinVelocity, 0.995f);
+        pinVelocity = CustomMathsLibrary.Scale(pinVelocity, damping);
+
         transform.position = pos;
     }
 }
