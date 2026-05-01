@@ -186,9 +186,18 @@ public class BowlingBallController : MonoBehaviour
 
             ballPos = CustomMathsLibrary.Add(ballPos, CustomMathsLibrary.Scale(normal, penetration));
 
+            CustomMathsLibrary.Vector3 ballDir = CustomMathsLibrary.Normalize(moveDir);
+
+            CustomMathsLibrary.Vector3 impactNormal = CustomMathsLibrary.Scale(normal, -1f);
+
+            float impactStrength = CustomMathsLibrary.Dot(ballDir, impactNormal);
+            impactStrength = CustomMathsLibrary.Clamp(impactStrength, 0f, 1f);
+
+            print(impactStrength);
+
             float speed = CustomMathsLibrary.Magnitude(moveDir);
 
-            CustomMathsLibrary.Vector3 impulse = CustomMathsLibrary.Scale(normal, speed * ballMass);
+            CustomMathsLibrary.Vector3 impulse = CustomMathsLibrary.Scale(ballDir, speed * ballMass * impactStrength);
 
             pin.ApplyImpulse(impulse);
 
