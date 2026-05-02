@@ -8,7 +8,7 @@ public class BowlingPinController : MonoBehaviour
 
     private CustomMathsLibrary.Vector3 pinVelocity = CustomMathsLibrary.Vector3.zero;
     private float verticalVelocity;
-    private bool isGrounded;
+    private bool isGrounded, hasFallen;
 
     private CustomMathsLibrary.Vector3 up = new CustomMathsLibrary.Vector3(0, 1, 0);
 
@@ -27,7 +27,24 @@ public class BowlingPinController : MonoBehaviour
 
     public void ApplyImpulse(CustomMathsLibrary.Vector3 impulse, CustomMathsLibrary.Vector3 hitPoint)
     {
+        float impulseMag = CustomMathsLibrary.Magnitude(impulse);
+
+        float minImpulse = 1.5f;
+
+        if (impulseMag < minImpulse)
+        {
+            CustomMathsLibrary.Vector3 dir = CustomMathsLibrary.Normalize(impulse);
+            impulse = CustomMathsLibrary.Scale(dir, minImpulse);
+        }
+
         pinVelocity = CustomMathsLibrary.Add(pinVelocity, CustomMathsLibrary.Scale(impulse, 1f / pinMass));
+
+        float minVelocity = 1.2f;
+
+        if (CustomMathsLibrary.Magnitude(pinVelocity) < minVelocity)
+        {
+            pinVelocity = CustomMathsLibrary.Scale(CustomMathsLibrary.Normalize(pinVelocity), minVelocity);
+        }
 
         CustomMathsLibrary.Vector3 pinCenter = transform.position;
 
@@ -35,11 +52,19 @@ public class BowlingPinController : MonoBehaviour
 
         CustomMathsLibrary.Vector3 torque = CustomMathsLibrary.CrossProduct(r, impulse);
 
-        float intertiaForce = pinMass * 0.1f;
+        float intertiaForce = pinMass * 0.05f;
+        float torqueBoost = 2f;
 
-        CustomMathsLibrary.Vector3 angularAccel = CustomMathsLibrary.Scale(torque, 1f / intertiaForce);
+        CustomMathsLibrary.Vector3 angularAccel = CustomMathsLibrary.Scale(torque, torqueBoost / intertiaForce);
 
         angularVelocity = CustomMathsLibrary.Add(angularVelocity, angularAccel);
+
+        float minSpin = 2f;
+
+        if (CustomMathsLibrary.Magnitude(angularVelocity) < minSpin)
+        {
+            angularVelocity = CustomMathsLibrary.Scale(CustomMathsLibrary.Normalize(angularVelocity), minSpin);
+        }
     }
 
     private void FixedUpdate()
@@ -62,10 +87,52 @@ public class BowlingPinController : MonoBehaviour
                 isGrounded = true;
             }
         }
+        else
+        {
+            verticalVelocity = 0f;
+        }
 
-        pinVelocity = CustomMathsLibrary.Scale(pinVelocity, 0.98f);
+        float angularDamping = isGrounded ? 0.96f : 0.98f;
+
+        angularVelocity = CustomMathsLibrary.Scale(angularVelocity, angularDamping);
+
+        if (hasFallen)
+        {
+            angularVelocity = CustomMathsLibrary.Scale(angularVelocity, 0.7f);
+
+            if (CustomMathsLibrary.Magnitude(angularVelocity) < 0.05f)
+            {
+                angularVelocity = CustomMathsLibrary.Vector3.zero;
+            }
+        }
 
         transform.position = pos;
+
+        CustomMathsLibrary.Vector3 upDir = rotation.RotateVector(up);
+        CustomMathsLibrary.Vector3 tiltAxis = CustomMathsLibrary.CrossProduct(up, upDir);
+
+        // 1 == upright, 0 == sideways, < 0 upside down
+        float uprightDot = CustomMathsLibrary.Dot(upDir, up);
+
+        if (!hasFallen && uprightDot < 0.2f)
+        {
+            hasFallen = true;
+        }
+
+        float tiltAmount = CustomMathsLibrary.Magnitude(tiltAxis);
+
+        if (!hasFallen && tiltAmount > 0.01f)
+        {
+            float tipStrength = 4f;
+
+            float angSpeed = CustomMathsLibrary.Magnitude(angularVelocity);
+            if (angSpeed < 1f)
+            {
+                tipStrength *= 3f;
+            }
+
+            angularVelocity = CustomMathsLibrary.Add(angularVelocity, CustomMathsLibrary.Scale(tiltAxis, tipStrength * Time.deltaTime));
+        }
 
         float angularSpeed = CustomMathsLibrary.Magnitude(angularVelocity);
 
@@ -80,8 +147,27 @@ public class BowlingPinController : MonoBehaviour
             rotation = deltaRot * rotation;
         }
 
-        angularVelocity = CustomMathsLibrary.Scale(angularVelocity, 0.98f);
-
         transform.rotation = rotation.ToUnityQuaternion();
+
+        // Stops micro movement
+
+        if (CustomMathsLibrary.Magnitude(pinVelocity) < 0.01f) pinVelocity = CustomMathsLibrary.Vector3.zero;
+
+        if (CustomMathsLibrary.Magnitude(angularVelocity) < 0.01f) angularVelocity = CustomMathsLibrary.Vector3.zero;
+
+        upDir = rotation.RotateVector(up);
+
+        uprightDot = CustomMathsLibrary.Dot(upDir, up);
+
+        if (hasFallen && CustomMathsLibrary.Magnitude(pinVelocity) < 0.05f && CustomMathsLibrary.Magnitude(angularVelocity) < 0.1f)
+        {
+            pinVelocity = CustomMathsLibrary.Vector3.zero;
+            angularVelocity = CustomMathsLibrary.Vector3.zero;
+        }
+    }
+
+    public CustomMathsLibrary.Vector3 GetVelocity()
+    {
+        return pinVelocity;
     }
 }
