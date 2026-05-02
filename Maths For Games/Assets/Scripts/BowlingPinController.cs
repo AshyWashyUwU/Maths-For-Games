@@ -12,6 +12,9 @@ public class BowlingPinController : MonoBehaviour
 
     private CustomMathsLibrary.Vector3 up = new CustomMathsLibrary.Vector3(0, 1, 0);
 
+    private CustomMathsLibrary.Vector3 angularVelocity = CustomMathsLibrary.Vector3.zero;
+    private CustomMathsLibrary.Quat rotation = new CustomMathsLibrary.Quat(1, 0, 0, 0);
+
     public CustomMathsLibrary.Vector3 GetBottom()
     {
         return new CustomMathsLibrary.Vector3(transform.position.x, transform.position.y - (pinHeight * 0.5f), transform.position.z);
@@ -22,9 +25,21 @@ public class BowlingPinController : MonoBehaviour
         return new CustomMathsLibrary.Vector3(transform.position.x, transform.position.y + (pinHeight * 0.5f), transform.position.z);
     }
 
-    public void ApplyImpulse(CustomMathsLibrary.Vector3 impulse)
+    public void ApplyImpulse(CustomMathsLibrary.Vector3 impulse, CustomMathsLibrary.Vector3 hitPoint)
     {
         pinVelocity = CustomMathsLibrary.Add(pinVelocity, CustomMathsLibrary.Scale(impulse, 1f / pinMass));
+
+        CustomMathsLibrary.Vector3 pinCenter = transform.position;
+
+        CustomMathsLibrary.Vector3 r = CustomMathsLibrary.Subtract(hitPoint, pinCenter);
+
+        CustomMathsLibrary.Vector3 torque = CustomMathsLibrary.CrossProduct(r, impulse);
+
+        float intertiaForce = pinMass * 0.1f;
+
+        CustomMathsLibrary.Vector3 angularAccel = CustomMathsLibrary.Scale(torque, 1f / intertiaForce);
+
+        angularVelocity = CustomMathsLibrary.Add(angularVelocity, angularAccel);
     }
 
     private void FixedUpdate()
@@ -51,5 +66,22 @@ public class BowlingPinController : MonoBehaviour
         pinVelocity = CustomMathsLibrary.Scale(pinVelocity, 0.98f);
 
         transform.position = pos;
+
+        float angularSpeed = CustomMathsLibrary.Magnitude(angularVelocity);
+
+        if (angularSpeed > 0.0001f)
+        {
+            CustomMathsLibrary.Vector3 axis = CustomMathsLibrary.Normalize(angularVelocity);
+
+            float angle = angularSpeed * Time.deltaTime;
+
+            CustomMathsLibrary.Quat deltaRot = new CustomMathsLibrary.Quat(axis, angle);
+
+            rotation = deltaRot * rotation;
+        }
+
+        angularVelocity = CustomMathsLibrary.Scale(angularVelocity, 0.98f);
+
+        transform.rotation = rotation.ToUnityQuaternion();
     }
 }

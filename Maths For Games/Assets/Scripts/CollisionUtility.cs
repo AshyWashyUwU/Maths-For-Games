@@ -2,9 +2,11 @@ using UnityEngine;
 
 public class CollisionUtility : MonoBehaviour
 {
-    public static bool SphereCapsuleCollision(CustomMathsLibrary.Vector3 sphereCenter, float sphereRadius, CustomMathsLibrary.Vector3 capsuleA, CustomMathsLibrary.Vector3 capsuleB, float capsuleRadius, out CustomMathsLibrary.Vector3 collisionNormal, out float penetrationDepth)
+    public static bool SphereCapsuleCollision(CustomMathsLibrary.Vector3 sphereCenter, float sphereRadius, CustomMathsLibrary.Vector3 capsuleA, CustomMathsLibrary.Vector3 capsuleB, float capsuleRadius, out CustomMathsLibrary.Vector3 collisionNormal, out float penetrationDepth, out CustomMathsLibrary.Vector3 hitPoint)
     {
         CustomMathsLibrary.Vector3 closestPoint = CustomMathsLibrary.ClosestPointOnSegment(capsuleA, capsuleB, sphereCenter);
+
+        hitPoint = closestPoint;
 
         CustomMathsLibrary.Vector3 delta = CustomMathsLibrary.Subtract(sphereCenter, closestPoint);
 

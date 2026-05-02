@@ -179,8 +179,9 @@ public class BowlingBallController : MonoBehaviour
         {
             CustomMathsLibrary.Vector3 normal;
             float penetration;
+            CustomMathsLibrary.Vector3 hitPoint;
 
-            bool hit = CollisionUtility.SphereCapsuleCollision(ballPos, ballRadius, pin.GetBottom(), pin.GetTop(), pin.pinRadius, out normal, out penetration);
+            bool hit = CollisionUtility.SphereCapsuleCollision(ballPos, ballRadius, pin.GetBottom(), pin.GetTop(), pin.pinRadius, out normal, out penetration, out hitPoint);
             
             if (!hit) continue;
 
@@ -199,7 +200,7 @@ public class BowlingBallController : MonoBehaviour
 
             CustomMathsLibrary.Vector3 impulse = CustomMathsLibrary.Scale(ballDir, speed * ballMass * impactStrength);
 
-            pin.ApplyImpulse(impulse);
+            pin.ApplyImpulse(impulse, hitPoint);
 
             appliedThrowCharge *= 0.7f;
             ballRollSpeed *=0.85f;
