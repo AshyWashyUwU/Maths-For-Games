@@ -2,18 +2,40 @@ using UnityEngine;
 
 public class BowlingPinController : MonoBehaviour
 {
-    public float pinRadius = 0.15f;
-    public float pinHeight = 1.2f;
-    public float pinMass = 2f;
+    [Header("Pin Physical Variables")]
+    [Range(0.25f, 1)] [SerializeField] private float pinRadius = 0.5f;
+    [Range(0.5f, 2)]  [SerializeField] private float pinHeight = 2f;
+    [Range(1, 5)]     [SerializeField] private float pinMass = 2f;
 
-    private CustomMathsLibrary.Vector3 pinVelocity = CustomMathsLibrary.Vector3.zero;
-    private float verticalVelocity;
-    private bool isGrounded, hasFallen;
+    public CustomMathsLibrary.Vector3 pinVelocity { get; private set; } = CustomMathsLibrary.Vector3.zero;
+    private CustomMathsLibrary.Vector3 angularVelocity = CustomMathsLibrary.Vector3.zero;
 
     private CustomMathsLibrary.Vector3 up = new CustomMathsLibrary.Vector3(0, 1, 0);
+    private CustomMathsLibrary.Vector3 bottomPoint = CustomMathsLibrary.Vector3.zero;
 
-    private CustomMathsLibrary.Vector3 angularVelocity = CustomMathsLibrary.Vector3.zero;
     private CustomMathsLibrary.Quat rotation = new CustomMathsLibrary.Quat(1, 0, 0, 0);
+
+    private float inertia;
+
+    private bool isGrounded;
+    private bool hasFallen;
+
+    private CustomMathsLibrary.Quat finalRotation;
+
+    private void Start()
+    {
+        inertia = (1f / 12f) * pinMass * (3 * pinRadius * pinRadius + pinHeight * pinHeight);
+    }
+
+    public float GetPinRadius()
+    {
+        return pinRadius;
+    }
+
+    public float GetPinMass()
+    {
+        return pinMass;
+    }
 
     public CustomMathsLibrary.Vector3 GetBottom()
     {
@@ -22,152 +44,173 @@ public class BowlingPinController : MonoBehaviour
 
     public CustomMathsLibrary.Vector3 GetTop()
     {
-        return new CustomMathsLibrary.Vector3(transform.position.x, transform.position.y + (pinHeight * 0.5f), transform.position.z);
-    }
-
-    public void ApplyImpulse(CustomMathsLibrary.Vector3 impulse, CustomMathsLibrary.Vector3 hitPoint)
-    {
-        float impulseMag = CustomMathsLibrary.Magnitude(impulse);
-
-        float minImpulse = 1.5f;
-
-        if (impulseMag < minImpulse)
-        {
-            CustomMathsLibrary.Vector3 dir = CustomMathsLibrary.Normalize(impulse);
-            impulse = CustomMathsLibrary.Scale(dir, minImpulse);
-        }
-
-        pinVelocity = CustomMathsLibrary.Add(pinVelocity, CustomMathsLibrary.Scale(impulse, 1f / pinMass));
-
-        float minVelocity = 1.2f;
-
-        if (CustomMathsLibrary.Magnitude(pinVelocity) < minVelocity)
-        {
-            pinVelocity = CustomMathsLibrary.Scale(CustomMathsLibrary.Normalize(pinVelocity), minVelocity);
-        }
-
-        CustomMathsLibrary.Vector3 pinCenter = transform.position;
-
-        CustomMathsLibrary.Vector3 r = CustomMathsLibrary.Subtract(hitPoint, pinCenter);
-
-        CustomMathsLibrary.Vector3 torque = CustomMathsLibrary.CrossProduct(r, impulse);
-
-        float intertiaForce = pinMass * 0.05f;
-        float torqueBoost = 2f;
-
-        CustomMathsLibrary.Vector3 angularAccel = CustomMathsLibrary.Scale(torque, torqueBoost / intertiaForce);
-
-        angularVelocity = CustomMathsLibrary.Add(angularVelocity, angularAccel);
-
-        float minSpin = 2f;
-
-        if (CustomMathsLibrary.Magnitude(angularVelocity) < minSpin)
-        {
-            angularVelocity = CustomMathsLibrary.Scale(CustomMathsLibrary.Normalize(angularVelocity), minSpin);
-        }
+        return new CustomMathsLibrary.Vector3(transform.position.x, transform.position.y + (pinHeight * 0.5f) - pinRadius, transform.position.z);
     }
 
     private void FixedUpdate()
     {
+        float dt = Time.deltaTime;
+
         CustomMathsLibrary.Vector3 pos = transform.position;
 
+        UpdatePosition(ref pos);
+
+        ApplyGravityTorque(pos);
+
+        ApplyDamping();
+
+        if (!hasFallen) { CheckFallen(); ApplyAngularRotation(); }
+
+        CorrectPosition(ref pos);
+
+        CheckSleep();
+
+        if (hasFallen) { ApplyRotation(); }
+
+        ApplyTransform(pos);
+
+        DrawDebugs();
+    }
+
+    public void ApplyImpulse(CustomMathsLibrary.Vector3 impulse, CustomMathsLibrary.Vector3 hitPoint)
+    {
+        float impulseBoost = 1.5f;
+        impulse = CustomMathsLibrary.Scale(impulse, impulseBoost);
+
+        pinVelocity = CustomMathsLibrary.Add(pinVelocity, CustomMathsLibrary.Scale(impulse, 1f / pinMass));
+
+        CustomMathsLibrary.Vector3 r = CustomMathsLibrary.Subtract(hitPoint, transform.position);
+        CustomMathsLibrary.Vector3 torque = CustomMathsLibrary.CrossProduct(r, impulse);
+
+        CustomMathsLibrary.Vector3 angularAccel = CustomMathsLibrary.Scale(torque, 1f / inertia);
+
+        angularVelocity = CustomMathsLibrary.Add(angularVelocity, angularAccel);
+    }
+
+    private CustomMathsLibrary.Vector3 GetUpDir()
+    {
+        return rotation.RotateVector(up);
+    }
+
+    private CustomMathsLibrary.Vector3 GetBottomPoint(CustomMathsLibrary.Vector3 pos)
+    {
+        return CustomMathsLibrary.Subtract(pos, CustomMathsLibrary.Scale(GetUpDir(), (pinHeight * 0.5f) - pinRadius));
+    }
+
+    private void UpdatePosition(ref CustomMathsLibrary.Vector3 pos)
+    {
         pos = CustomMathsLibrary.Add(pos, CustomMathsLibrary.Scale(pinVelocity, Time.deltaTime));
+    }
 
-        if (!isGrounded)
+    private void ApplyGravityTorque(CustomMathsLibrary.Vector3 pos)
+    {
+        bottomPoint = GetBottomPoint(pos);
+
+        if (bottomPoint.y <= WorldData.worldGroundPos)
         {
-            verticalVelocity += CustomPhysicsLibrary.CaculateObjectGravityForce(pinMass) * Time.deltaTime;
-            pos.y += verticalVelocity * Time.deltaTime;
-
-            float bottom = pos.y - (pinHeight * 0.5f);
-
-            if (bottom <= WorldData.worldGroundPos)
-            {
-                pos.y = WorldData.worldGroundPos + (pinHeight * 0.5f);
-                verticalVelocity = 0;
-                isGrounded = true;
-            }
+            float penetration = WorldData.worldGroundPos - bottomPoint.y;
+            pos.y += penetration;
+            isGrounded = true;
         }
         else
         {
-            verticalVelocity = 0f;
+            isGrounded = false;
         }
 
-        float angularDamping = isGrounded ? 0.96f : 0.98f;
-
-        angularVelocity = CustomMathsLibrary.Scale(angularVelocity, angularDamping);
-
-        if (hasFallen)
+        if (isGrounded && !hasFallen)
         {
-            angularVelocity = CustomMathsLibrary.Scale(angularVelocity, 0.7f);
+            CustomMathsLibrary.Vector3 gravityForce = new CustomMathsLibrary.Vector3(0, pinMass * -9.81f, 0);
 
-            if (CustomMathsLibrary.Magnitude(angularVelocity) < 0.05f)
-            {
-                angularVelocity = CustomMathsLibrary.Vector3.zero;
-            }
+            CustomMathsLibrary.Vector3 r = CustomMathsLibrary.Subtract(pos, bottomPoint);
+
+            CustomMathsLibrary.Vector3 torque = CustomMathsLibrary.CrossProduct(r, gravityForce);
+
+            CustomMathsLibrary.Vector3 angularAccel = CustomMathsLibrary.Scale(torque, 1f / inertia);
+
+            angularVelocity = CustomMathsLibrary.Add(angularVelocity, CustomMathsLibrary.Scale(angularAccel, Time.deltaTime));
         }
+    }
 
-        transform.position = pos;
+    private void ApplyDamping()
+    {
+        float linearDamping = isGrounded ? 0.9f : 0.99f;
+        pinVelocity = CustomMathsLibrary.Scale(pinVelocity, linearDamping);
 
-        CustomMathsLibrary.Vector3 upDir = rotation.RotateVector(up);
-        CustomMathsLibrary.Vector3 tiltAxis = CustomMathsLibrary.CrossProduct(up, upDir);
+        float angularDamping = isGrounded ? 0.94f : 0.98f;
+        angularVelocity = CustomMathsLibrary.Scale(angularVelocity, angularDamping);
+    }
 
-        // 1 == upright, 0 == sideways, < 0 upside down
-        float uprightDot = CustomMathsLibrary.Dot(upDir, up);
+    private void CheckFallen()
+    {
+        if (hasFallen) return;
 
-        if (!hasFallen && uprightDot < 0.2f)
+        float uprightDot = CustomMathsLibrary.Dot(GetUpDir(), up);
+
+        if (!hasFallen && uprightDot < 0.25f)
         {
             hasFallen = true;
+
+            CustomMathsLibrary.Vector3 fallAxis = CustomMathsLibrary.CrossProduct(up, GetUpDir());
+            if (CustomMathsLibrary.Magnitude(fallAxis) < 0.001f) fallAxis = new CustomMathsLibrary.Vector3(1,0,0);
+
+            finalRotation = new CustomMathsLibrary.Quat(fallAxis, Mathf.PI / 2);
         }
+    }
 
-        float tiltAmount = CustomMathsLibrary.Magnitude(tiltAxis);
-
-        if (!hasFallen && tiltAmount > 0.01f)
-        {
-            float tipStrength = 4f;
-
-            float angSpeed = CustomMathsLibrary.Magnitude(angularVelocity);
-            if (angSpeed < 1f)
-            {
-                tipStrength *= 3f;
-            }
-
-            angularVelocity = CustomMathsLibrary.Add(angularVelocity, CustomMathsLibrary.Scale(tiltAxis, tipStrength * Time.deltaTime));
-        }
-
+    private void ApplyAngularRotation()
+    {
         float angularSpeed = CustomMathsLibrary.Magnitude(angularVelocity);
 
-        if (angularSpeed > 0.0001f)
+        if (angularSpeed > 0.00001f)
         {
             CustomMathsLibrary.Vector3 axis = CustomMathsLibrary.Normalize(angularVelocity);
-
             float angle = angularSpeed * Time.deltaTime;
 
             CustomMathsLibrary.Quat deltaRot = new CustomMathsLibrary.Quat(axis, angle);
-
             rotation = deltaRot * rotation;
         }
+    }
 
-        transform.rotation = rotation.ToUnityQuaternion();
+    private void CorrectPosition(ref CustomMathsLibrary.Vector3 pos)
+    {
+        CustomMathsLibrary.Vector3 newUp = rotation.RotateVector(up);
 
-        // Stops micro movement
+        pos = CustomMathsLibrary.Add(bottomPoint, CustomMathsLibrary.Scale(newUp, (pinHeight * 0.5f) - pinRadius));
+    }
 
-        if (CustomMathsLibrary.Magnitude(pinVelocity) < 0.01f) pinVelocity = CustomMathsLibrary.Vector3.zero;
+    private void CheckSleep()
+    {
+        float sleepThreshold = 0.02f;
 
-        if (CustomMathsLibrary.Magnitude(angularVelocity) < 0.01f) angularVelocity = CustomMathsLibrary.Vector3.zero;
-
-        upDir = rotation.RotateVector(up);
-
-        uprightDot = CustomMathsLibrary.Dot(upDir, up);
-
-        if (hasFallen && CustomMathsLibrary.Magnitude(pinVelocity) < 0.05f && CustomMathsLibrary.Magnitude(angularVelocity) < 0.1f)
+        if (CustomMathsLibrary.Magnitude(pinVelocity) < sleepThreshold && CustomMathsLibrary.Magnitude(angularVelocity) < sleepThreshold)
         {
             pinVelocity = CustomMathsLibrary.Vector3.zero;
             angularVelocity = CustomMathsLibrary.Vector3.zero;
         }
     }
 
-    public CustomMathsLibrary.Vector3 GetVelocity()
+    private void ApplyRotation()
     {
-        return pinVelocity;
+        angularVelocity = CustomMathsLibrary.Vector3.zero;
+
+        rotation = finalRotation;
+    }
+
+    private void ApplyTransform(CustomMathsLibrary.Vector3 pos)
+    {
+        transform.position = pos;
+        transform.rotation = rotation.ToUnityQuaternion();
+    }
+
+    private void DrawDebugs()
+    {
+        CustomMathsLibrary.Vector3 upDirDebug = rotation.RotateVector(up);
+
+        Debug.DrawLine(transform.position, transform.position + (Vector3)upDirDebug, Color.green);
+        Debug.DrawLine(transform.position, transform.position + (Vector3)pinVelocity, Color.blue);
+
+        CustomMathsLibrary.Vector3 bottomDebug = CustomMathsLibrary.Subtract(transform.position, CustomMathsLibrary.Scale(upDirDebug, pinHeight * 0.5f));
+
+        Debug.DrawLine(bottomDebug, CustomMathsLibrary.Add(bottomDebug, new CustomMathsLibrary.Vector3(0, 0.5f, 0)), Color.red);
     }
 }

@@ -177,54 +177,63 @@ public class BowlingBallController : MonoBehaviour
     {
         foreach (var pin in pins)
         {
-            CustomMathsLibrary.Vector3 normal;
-            float penetration;
-            CustomMathsLibrary.Vector3 hitPoint;
+            if (!CheckCollision(ballPos, ballRadius, pin, out var normal, out var penetration, out var hitPoint)) continue;
 
-            bool hit = CollisionUtility.SphereCapsuleCollision(ballPos, ballRadius, pin.GetBottom(), pin.GetTop(), pin.pinRadius, out normal, out penetration, out hitPoint);
-            
-            if (!hit) continue;
-
-            print("Hit!");
-
-            ballPos = CustomMathsLibrary.Add(ballPos, CustomMathsLibrary.Scale(normal, penetration));
-
-            CustomMathsLibrary.Vector3 ballDir = CustomMathsLibrary.Normalize(moveDir);
+            ResolveBallPenetration(ref ballPos, normal, penetration);
 
             CustomMathsLibrary.Vector3 impactNormal = CustomMathsLibrary.Scale(normal, -1f);
 
-            float impactStrength = CustomMathsLibrary.Dot(ballDir, impactNormal);
-            impactStrength = CustomMathsLibrary.Clamp(impactStrength, 0f, 1f);
+            float impactStrength = ComputeImpactStrength(moveDir, impactNormal);
 
-            print(impactStrength);
+            if (impactStrength <= 0f) continue;
 
-            float speed = CustomMathsLibrary.Magnitude(moveDir);
+            ApplyCollisionImpulse(pin, ref moveDir, moveDir, impactNormal, hitPoint);
+        }
+    }
 
-            CustomMathsLibrary.Vector3 ballVel = CustomMathsLibrary.Scale(ballDir, speed);
-            CustomMathsLibrary.Vector3 pinVel = pin.GetVelocity();
+    private bool CheckCollision(CustomMathsLibrary.Vector3 ballPos, float ballRadius, BowlingPinController pin, out CustomMathsLibrary.Vector3 normal, out float penetration, out CustomMathsLibrary.Vector3 hitPoint)
+    {
+        return CollisionUtility.SphereCapsuleCollision(ballPos, ballRadius, pin.GetBottom(), pin.GetTop(), pin.GetPinRadius(), out normal, out penetration, out hitPoint);
+    }
+
+    private void ResolveBallPenetration(ref CustomMathsLibrary.Vector3 ballPos, CustomMathsLibrary.Vector3 normal, float penetration)
+    {
+        ballPos = CustomMathsLibrary.Add(ballPos, CustomMathsLibrary.Scale(normal, penetration));
+    }
+
+    private float ComputeImpactStrength(CustomMathsLibrary.Vector3 moveDir, CustomMathsLibrary.Vector3 impactNormal)
+    {
+        CustomMathsLibrary.Vector3 ballDir = CustomMathsLibrary.Normalize(moveDir);
+        float impactStrength = CustomMathsLibrary.Dot(ballDir, impactNormal);
+        return CustomMathsLibrary.Clamp(impactStrength, 0f, 1f);
+    }
+
+        private void ApplyCollisionImpulse(BowlingPinController pin, ref CustomMathsLibrary.Vector3 moveDir, CustomMathsLibrary.Vector3 moveDirOriginal, CustomMathsLibrary.Vector3 impactNormal, CustomMathsLibrary.Vector3 hitPoint)
+        {
+            float speed = CustomMathsLibrary.Magnitude(moveDirOriginal);
+
+            CustomMathsLibrary.Vector3 ballVel = CustomMathsLibrary.Scale(CustomMathsLibrary.Normalize(moveDirOriginal), speed);
+            CustomMathsLibrary.Vector3 pinVel = pin.pinVelocity;
 
             CustomMathsLibrary.Vector3 relativeVel = CustomMathsLibrary.Subtract(ballVel, pinVel);
-
             float seperatingVel = CustomMathsLibrary.Dot(relativeVel, impactNormal);
 
-            if (seperatingVel <= 0f) continue;
+            if (seperatingVel <= 0f) return;
 
-            float restitution = 0.4f;
-
+            float restitution = 0.7f;
             float impulseScalar = (1f + restitution) * seperatingVel;
-            impulseScalar /= (1f / ballMass) + (1f / pin.pinMass);
+            impulseScalar /= (1f / ballMass) + (1f / pin.GetPinMass());
+
+            float impulseBoost = 3.5f;
+            impulseScalar *= impulseBoost;
 
             CustomMathsLibrary.Vector3 collisionImpulse = CustomMathsLibrary.Scale(impactNormal, impulseScalar);
 
             pin.ApplyImpulse(collisionImpulse, hitPoint);
 
-            CustomMathsLibrary.Vector3 ballImpulse = CustomMathsLibrary.Scale(collisionImpulse, -1f);
-
-            CustomMathsLibrary.Vector3 ballVelChange = CustomMathsLibrary.Scale(ballImpulse, 1f / ballMass);
-
+            CustomMathsLibrary.Vector3 ballVelChange = CustomMathsLibrary.Scale(collisionImpulse, -1f / ballMass);
             moveDir = CustomMathsLibrary.Add(moveDir, ballVelChange);
         }
-    }
 
     // Returns a charge force based on the ball's current position (pos) as an input
     // More charge = ball moves backward more until hitting the limit
