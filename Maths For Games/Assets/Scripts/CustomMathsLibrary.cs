@@ -423,6 +423,59 @@ public static class CustomMathsLibrary
         return Add(a, Scale(ab, t));
     }
 
+    public static void ClosestPointsBetweenSegments(Vector3 p1, Vector3 q1, Vector3 p2, Vector3 q2, out Vector3 c1, out Vector3 c2)
+    {
+        Vector3 d1 = Subtract(q1, p1);
+        Vector3 d2 = Subtract(q2, p2);
+        Vector3 r = Subtract(p1, p2);
+
+        float a = Dot(d1, d1);
+        float e = Dot(d2, d2);
+        float f = Dot(d2, r);
+
+        float s, t;
+
+        if (a <= 1e-6f && e <= 1e-6f)
+        {
+            s = t = 0.0f;
+            c1 = p1;
+            c2 = p2;
+            return;
+        }
+
+        if (a <= 1e-6f)
+        {
+            s = 0.0f;
+            t = f / e;
+            t = Mathf.Clamp01(t);
+        }
+        else
+        {
+            float c = Dot(d1, r);
+            if (e <= 1e-6f)
+            {
+                t = 0;
+                s = Mathf.Clamp01(-c / a);
+            }
+            else
+            {
+                float b = Dot(d1, d2);
+                float denom = a * e - b * b;
+
+                if (denom != 0) s = Mathf.Clamp01((b * f - c * e) / denom);
+                else s = 0;
+
+                t = (b * s + f) / e;
+
+                if (t < 0.0f) { t = 0.0f; s = Mathf.Clamp01(-c / a); }
+                else if (t > 1.0f) { t = 1.0f; s = Mathf.Clamp01((b - c) / a); }
+            }
+        }
+
+        c1 = Add(p1, Scale(d1, s));
+        c2 = Add(p2, Scale(d2, t));
+    }
+
     // ------------------------------------ VECTOR4 MATH ------------------------------------ // 
 
     // Adds two Vector4s together

@@ -41,15 +41,11 @@ public class BowlingBallController : MonoBehaviour
 
     private CustomMathsLibrary.Quat currentRotation = new CustomMathsLibrary.Quat(1, 0, 0, 0); // Stored quaternion for the ball spin
 
-    // ------ Constraint Variables ------ //
-
-    [Header("Ball Constraints")]
-    [Range(5, 50)]   [SerializeField] private float resetDistance = 30f; // The maxiumum distance the ball can travel before being reset
-
     private CustomMathsLibrary.Vector3 up = new CustomMathsLibrary.Vector3(0, 1, 0); // World up
 
     // ------ Collision Variables ------ //
 
+    [Header("Ball Collisions")]
     [SerializeField] private BowlingPinController[] pins;
     [SerializeField, Range(0f, 10f)] private float minImpulseBoost = 2f;  // minimum at 0 charge
     [SerializeField, Range(0f, 40f)] private float maxImpulseBoost = 10f; // maximum at full charge
@@ -156,7 +152,7 @@ public class BowlingBallController : MonoBehaviour
         // 8. (If charging) apply charge animation
         // 9. Apply collisions to the pins (HandlePinCollisions)
         // 10. Push the final pos to the transform (ApplyTransform)
-        // 11. If the final pos.z >= than the resetDistance, reset the ball entirely (ResetBall)
+        // 11. If the final pos.z >= than the laneDepth, reset the ball entirely (ResetBall)
 
         CustomMathsLibrary.Vector3 pos = transform.position; 
 
@@ -176,7 +172,7 @@ public class BowlingBallController : MonoBehaviour
 
         ApplyTransform(pos);
 
-        if (pos.z >= resetDistance) ResetBall();
+        if (pos.z >= WorldData.laneDepth) ResetBall();
     }
 
     // Iterate through all pins and check for collisions

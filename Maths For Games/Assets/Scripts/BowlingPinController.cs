@@ -19,11 +19,16 @@ public class BowlingPinController : MonoBehaviour
 
     private bool isGrounded;
     private bool hasFallen;
+    private bool hasCorrection;
 
     private CustomMathsLibrary.Quat finalRotation;
+    private CustomMathsLibrary.Vector3 position;
+    private CustomMathsLibrary.Vector3 storedCorrectionDelta;
 
     private void Start()
     {
+        position = transform.position;
+
         inertia = (1f / 12f) * pinMass * (3 * pinRadius * pinRadius + pinHeight * pinHeight);
     }
 
@@ -49,8 +54,6 @@ public class BowlingPinController : MonoBehaviour
 
     private void FixedUpdate()
     {
-        float dt = Time.deltaTime;
-
         CustomMathsLibrary.Vector3 pos = transform.position;
 
         UpdatePosition(ref pos);
@@ -68,6 +71,8 @@ public class BowlingPinController : MonoBehaviour
         CheckSleep();
 
         if (hasFallen) { ApplyRotation(); }
+
+        if (hasCorrection) ApplyCorrection(ref pos);
 
         ApplyTransform(pos);
 
@@ -87,6 +92,17 @@ public class BowlingPinController : MonoBehaviour
         CustomMathsLibrary.Vector3 angularAccel = CustomMathsLibrary.Scale(torque, 1f / inertia);
 
         angularVelocity = CustomMathsLibrary.Add(angularVelocity, angularAccel);
+    }
+
+    private void ApplyCorrection(ref CustomMathsLibrary.Vector3 pos)
+    {
+        pos = CustomMathsLibrary.Add(pos, storedCorrectionDelta);
+    }
+
+    public void StoreCorrectionDelta(CustomMathsLibrary.Vector3 delta)
+    {
+        hasCorrection = true;
+        storedCorrectionDelta = delta;
     }
 
     private CustomMathsLibrary.Vector3 GetUpDir()
