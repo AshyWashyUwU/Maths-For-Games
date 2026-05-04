@@ -63,6 +63,8 @@ public class BowlingPinController : MonoBehaviour
 
         CorrectPosition(ref pos);
 
+        ApplyConstraints(ref pos);
+
         CheckSleep();
 
         if (hasFallen) { ApplyRotation(); }
@@ -178,6 +180,15 @@ public class BowlingPinController : MonoBehaviour
         pos = CustomMathsLibrary.Add(bottomPoint, CustomMathsLibrary.Scale(newUp, (pinHeight * 0.5f) - pinRadius));
     }
 
+    private void ApplyConstraints(ref CustomMathsLibrary.Vector3 pos)
+    {
+        pos.x = CustomMathsLibrary.Clamp(pos.x, -WorldData.laneWidth + pinRadius, WorldData.laneWidth - pinRadius);
+
+        pos.z = CustomMathsLibrary.Clamp(pos.z, 0 + pinRadius, WorldData.laneDepth - pinRadius);
+
+        pos.y = Mathf.Max(pos.y, WorldData.worldGroundPos + pinRadius);
+    }
+
     private void CheckSleep()
     {
         float sleepThreshold = 0.02f;
@@ -207,10 +218,22 @@ public class BowlingPinController : MonoBehaviour
         CustomMathsLibrary.Vector3 upDirDebug = rotation.RotateVector(up);
 
         Debug.DrawLine(transform.position, transform.position + (Vector3)upDirDebug, Color.green);
+
         Debug.DrawLine(transform.position, transform.position + (Vector3)pinVelocity, Color.blue);
 
         CustomMathsLibrary.Vector3 bottomDebug = CustomMathsLibrary.Subtract(transform.position, CustomMathsLibrary.Scale(upDirDebug, pinHeight * 0.5f));
+        CustomMathsLibrary.Vector3 topDebug = CustomMathsLibrary.Add(transform.position, CustomMathsLibrary.Scale(upDirDebug, pinHeight * 0.5f));
 
-        Debug.DrawLine(bottomDebug, CustomMathsLibrary.Add(bottomDebug, new CustomMathsLibrary.Vector3(0, 0.5f, 0)), Color.red);
+        Debug.DrawLine(bottomDebug, topDebug, Color.red);
+
+        CustomMathsLibrary.Vector3 right = CustomMathsLibrary.Scale(CustomMathsLibrary.RotateAroundAxis(upDirDebug, new CustomMathsLibrary.Vector3(0, 1, 0), 0), pinRadius);
+        CustomMathsLibrary.Vector3 left = CustomMathsLibrary.Scale(CustomMathsLibrary.RotateAroundAxis(upDirDebug, new CustomMathsLibrary.Vector3(0, 1, 0), Mathf.PI), pinRadius);
+        CustomMathsLibrary.Vector3 forward = CustomMathsLibrary.Scale(CustomMathsLibrary.RotateAroundAxis(upDirDebug, new CustomMathsLibrary.Vector3(0, 1, 0), Mathf.PI / 2), pinRadius);
+        CustomMathsLibrary.Vector3 back = CustomMathsLibrary.Scale(CustomMathsLibrary.RotateAroundAxis(upDirDebug, new CustomMathsLibrary.Vector3(0, 1, 0), -Mathf.PI / 2), pinRadius);
+
+        Debug.DrawLine(bottomDebug, CustomMathsLibrary.Add(bottomDebug, right), Color.cyan);
+        Debug.DrawLine(bottomDebug, CustomMathsLibrary.Add(bottomDebug, left), Color.cyan);
+        Debug.DrawLine(bottomDebug, CustomMathsLibrary.Add(bottomDebug, forward), Color.cyan);
+        Debug.DrawLine(bottomDebug, CustomMathsLibrary.Add(bottomDebug, back), Color.cyan);
     }
 }
