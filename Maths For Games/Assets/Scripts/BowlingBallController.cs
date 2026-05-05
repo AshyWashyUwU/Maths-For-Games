@@ -95,7 +95,7 @@ public class BowlingBallController : MonoBehaviour
         }
     }
 
-    // Uses a charge/release system to apply inital force the ball when SPACE is held/released
+    // Uses a charge/release system to apply inital force the ball when SPACE is held/released,
     public void OnThrow(InputAction.CallbackContext context)
     {
         if (context.started && !thrownBall)
@@ -104,7 +104,8 @@ public class BowlingBallController : MonoBehaviour
         }
 
         // Adds some force to upward and forward motion when the SPACE key is released (based on ball mass)
-        // Heavier the ball = less force is applied
+        // More mass = less velocity
+        // More charge = more velocity
 
         if (context.canceled && isCharging && !thrownBall)
         {
@@ -125,6 +126,8 @@ public class BowlingBallController : MonoBehaviour
         // Handles the charging of the ball by time.deltaTime, clamping it to the max throwforce
         if (isCharging)
         {
+            // Esentially a linear accumulation over time (not impulse over time)
+            // charge(t) = charge0 + (rate * t)
             throwCharge += ballChargeSpeed * Time.deltaTime;
             throwCharge = CustomMathsLibrary.Clamp(throwCharge, 0f, maxThrowForce);
         }
@@ -154,8 +157,8 @@ public class BowlingBallController : MonoBehaviour
         // 10. Push the final pos to the transform (ApplyTransform)
         // 11. If the final pos.z >= than the laneDepth, reset the ball entirely (ResetBall)
 
+        // x = x + v * dt
         CustomMathsLibrary.Vector3 pos = transform.position; 
-
         pos = CustomMathsLibrary.Add(pos, new CustomMathsLibrary.Vector3(0, 0, -currentPullback));
 
         CustomMathsLibrary.Vector3 moveDir = GetMoveDir(pos);
@@ -231,11 +234,11 @@ public class BowlingBallController : MonoBehaviour
         if (seperatingVel <= 0f) return; // return if the ball is moving away
 
         // Caculate the impulse scalar using restitution (bounciness) and mass
+        // Uses the standard collision impulse equation
         float restitution = 0.7f;
         float impulseScalar = (1f + restitution) * seperatingVel;
         impulseScalar /= (1f / ballMass) + (1f / pin.GetPinMass());
 
-        // Assuming throwCharge is 0 to 0.3 (your example)
         float normalizedCharge = Mathf.Clamp01(throwCharge / 0.3f); 
 
         // Map it to an impulse boost
@@ -247,7 +250,7 @@ public class BowlingBallController : MonoBehaviour
         CustomMathsLibrary.Vector3 collisionImpulse = CustomMathsLibrary.Scale(impactNormal, impulseScalar);
 
         // Apply impulse with the hit point of the ball between the pin (hitPoint)
-        pin.ApplyImpulse(collisionImpulse, hitPoint);
+        pin.ApplyCollisionImpulse(collisionImpulse, hitPoint);
 
         // Apply inverse impulse to the ball, updating the move direction (moveDir)
         CustomMathsLibrary.Vector3 ballVelChange = CustomMathsLibrary.Scale(collisionImpulse, -1f / ballMass);
@@ -280,16 +283,20 @@ public class BowlingBallController : MonoBehaviour
         }
 
         // Caculates the inital forward direction by how much the ball has turned in degrees (yawDegrees) to radians (yawRadians)
+        // forward = (sin(theta),0,cos(theta))
         float yawRadians = CustomMathsLibrary.DegreesToRadians(yawDegrees);
         CustomMathsLibrary.Vector3 forward = CustomMathsLibrary.ForwardFromYawPitch(yawRadians, 0);
 
         // Creates a time-based bowling curve by clamping the hook time (hookTime)
         // Hook starts weak -> gets stronger overtime
+        // hookTime = min(1, t * 0.5)
         float hookTime = CustomMathsLibrary.Clamp(elapsedRollingTime * 0.5f, 0, 1);
 
         // Speed has an influence on the hook.
         // More speed -> stronger hook
         float hookSpeed = ballRollSpeed + (appliedThrowCharge * 0.15f);
+
+        // hookStrength = (speed * 0.25) * timeFactor
         float hookStrength = hookSpeed * 0.25f;
 
         // Finds the closest side of the lane and changes the direction based on it
@@ -299,10 +306,14 @@ public class BowlingBallController : MonoBehaviour
         if (hookDirection == 0) hookDirection = Mathf.Sign(closestSide);
 
         // Determines initial hook direction based on relative X position on lane: positive X -> hook right, negative X -> hook left
+        // Artificial hook, not based on actual momentum
         hookStrength = hookStrength * hookTime;
 
         // Building the hook vector by creating a sideways force by finding the right pos and combining it with hook strength (hookStrength) * hook direction * (hookDirection)
+        // r = up x forward
         CustomMathsLibrary.Vector3 right = CustomMathsLibrary.CrossProduct(up, forward);
+
+        // hook = right * S * dir
         CustomMathsLibrary.Vector3 hookVector = CustomMathsLibrary.Scale(right, hookStrength * hookDirection);
 
         // Returns the final movement/curved trajectory vector by combining the forward, hook speed (hookSpeed) and hook vector (hookVector)
@@ -315,6 +326,8 @@ public class BowlingBallController : MonoBehaviour
         // Creates a new velocity vector by scaling the move direction (moveDir) with either:
         // - The ball roll speed (ballRollSpeed) if the ball has been thrown
         // - The ball hold move speed (ballHoldMoveSpeed) if the ball has not been thrown
+
+        // v -> d ^ * s
         CustomMathsLibrary.Vector3 velocity = CustomMathsLibrary.Scale(moveDir, thrownBall ? ballRollSpeed : ballHoldMoveSpeed);
 
         // Returns the new position by adding the velocity onto the old position  
@@ -326,6 +339,7 @@ public class BowlingBallController : MonoBehaviour
         if (!isGrounded)
         {
             // Caculates the ball's vertical velocity (verticalVelocity) using the ball's mass (ballMass) and gravity from the CustomPhysicsLibrary (-9.81)
+            // v = v + g * dt
             verticalVelocity += CustomPhysicsLibrary.CaculateObjectGravityForce(ballMass) * Time.deltaTime;
 
             pos.y += verticalVelocity * Time.deltaTime;
@@ -340,6 +354,7 @@ public class BowlingBallController : MonoBehaviour
             }
 
             // Applies air resistance to the ball if it is still in the air using the air density from the CustomPhysicsLibrary
+            // Simplified into a scaling factor instead of using actual drag
             appliedThrowCharge *= 1f / (1f - CustomPhysicsLibrary.AIR_DENSITY * 6f * Time.deltaTime);
         }
         else
@@ -349,6 +364,7 @@ public class BowlingBallController : MonoBehaviour
             float area = Mathf.PI * ballRadius * ballRadius;
 
             // Caculates the drag force using the CustomPhysicsLibrary by combining speed and area
+            // Drag becomes simplified
             float dragForce = CustomPhysicsLibrary.CaculateObjectDragForce(speed, area);
 
             // Caculates the ball's final drag force by combining the inital dragforce with the ball's mass
@@ -356,6 +372,7 @@ public class BowlingBallController : MonoBehaviour
             float dragAccel = finalDrag * Time.deltaTime;
 
             // Reduces the ball's speed by clamping the drag (dragAccel) with the applied throw charge (appliedThrowCharge)
+            // v = v - a * dt
             appliedThrowCharge = CustomMathsLibrary.Clamp(appliedThrowCharge - dragAccel, 0f, appliedThrowCharge);
 
             // Apply multiplicative decay to roll speed to simulate ground friction from the CustomPhysicsLibrary

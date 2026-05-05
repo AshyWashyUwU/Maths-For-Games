@@ -19,7 +19,7 @@ public class PinCollisionManager : MonoBehaviour
                 var a = pins[i];
                 var b = pins[j];
 
-                if (!CollisionUtility.CapsuleCapsuleCollision( a.GetBottom(), a.GetTop(), a.GetPinRadius(), b.GetBottom(), b.GetTop(), b.GetPinRadius(), out var normal, out var penetration, out var hitPoint)) continue;
+                if (!CollisionUtility.CapsuleCapsuleCollision(a.GetBottom(), a.GetTop(), a.GetPinRadius(), b.GetBottom(), b.GetTop(), b.GetPinRadius(), out var normal, out var penetration, out var hitPoint)) continue;
 
                 ResolvePinPenetration(a, b, normal, penetration);
                 ApplyPinImpulse(a, b, normal, hitPoint);
@@ -54,14 +54,14 @@ public class PinCollisionManager : MonoBehaviour
 
         if (separatingVel > 0f) return;
 
-        float restitution = 0.6f;
+        float restitution = 0.25f;
 
         float impulseScalar = -(1f + restitution) * separatingVel;
         impulseScalar /= (1f / a.GetPinMass()) + (1f / b.GetPinMass());
 
         var impulse = CustomMathsLibrary.Scale(normal, impulseScalar);
 
-        a.ApplyImpulse(impulse, hitPoint);
-        b.ApplyImpulse(CustomMathsLibrary.Scale(impulse, -1f), hitPoint);
+        a.ApplyCollisionImpulse(impulse, hitPoint);
+        b.ApplyCollisionImpulse(CustomMathsLibrary.Scale(impulse, -1f), hitPoint);
     }
 }
