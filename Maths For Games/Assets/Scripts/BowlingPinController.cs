@@ -8,7 +8,7 @@ public class BowlingPinController : MonoBehaviour
     [Range(1, 5)]     [SerializeField] private float pinMass = 2f;
 
     public CustomMathsLibrary.Vector3 pinVelocity { get; private set; } = CustomMathsLibrary.Vector3.zero; // Linear velocity of the pin
-    private CustomMathsLibrary.Vector3 angularVelocity = CustomMathsLibrary.Vector3.zero; // Spin / tilt rate of the pin
+    public CustomMathsLibrary.Vector3 angularVelocity = CustomMathsLibrary.Vector3.zero; // Spin / tilt rate of the pin
 
     private CustomMathsLibrary.Vector3 up = new CustomMathsLibrary.Vector3(0, 1, 0); // World up
     private CustomMathsLibrary.Vector3 bottomPoint = CustomMathsLibrary.Vector3.zero; // Used to create the bottom point of the pin
@@ -28,6 +28,27 @@ public class BowlingPinController : MonoBehaviour
     private void Start()
     {
         startPosition = transform.position;
+
+        ResetPin();
+    }
+
+    // Resets the pins's variables to being held so it can be thrown again
+    public void ResetPin()
+    {
+        transform.position = startPosition;
+
+        transform.rotation = new CustomMathsLibrary.Quat(1, 0, 0, 0).ToUnityQuaternion();
+
+        isGrounded = false;
+        hasFallen = false;
+        hasCorrection = false;
+
+        finalRotation = new CustomMathsLibrary.Quat(1, 0, 0, 0);
+        storedCorrectionDelta = CustomMathsLibrary.Vector3.zero;
+
+        rotation = new CustomMathsLibrary.Quat(1, 0, 0, 0);
+        pinVelocity = CustomMathsLibrary.Vector3.zero;
+        angularVelocity = CustomMathsLibrary.Vector3.zero;
 
         inertia = (1f / 12f) * pinMass * (3 * pinRadius * pinRadius + pinHeight * pinHeight); // Computes moment of intertia for the pin (which is a cylinder-like object)
     }
@@ -67,17 +88,17 @@ public class BowlingPinController : MonoBehaviour
         CustomMathsLibrary.Vector3 pos = transform.position;
         pos = CustomMathsLibrary.Add(pos, CustomMathsLibrary.Scale(pinVelocity, Time.deltaTime));
 
-        ApplyGravityTorque(pos);
+        ApplyGravityTorque(ref pos);
 
         ApplyDamping();
 
-        if (!hasFallen) { CheckFallen(); ApplyAngularRotation(); }
+        //if (!hasFallen) { CheckFallen(); ApplyAngularRotation(); }
 
         CorrectPosition(ref pos);
 
         ApplyConstraints(ref pos);
 
-        if (hasFallen) { ConstrainRotation(); }
+        //if (hasFallen) { ConstrainRotation(); }
 
         if (hasCorrection) ApplyCollisionCorrection(ref pos);
 
@@ -92,6 +113,7 @@ public class BowlingPinController : MonoBehaviour
     {
         // Artificial boost (impulseBoost) to increase the collision strength
         float impulseBoost = 1.5f;
+        float angularBoost = 0.8f;
         impulse = CustomMathsLibrary.Scale(impulse, impulseBoost);
 
         // Applies linear impulse to the ball to push it away from the hit point (deltaTime = ib / m)
@@ -107,17 +129,23 @@ public class BowlingPinController : MonoBehaviour
         // Converts torque into angular acceleration (angularAccel)
         CustomMathsLibrary.Vector3 angularAccel = CustomMathsLibrary.Scale(torque, 1f / inertia);
 
+        if (angularAccel.x < 0)
+        {
+            angularAccel = new CustomMathsLibrary.Vector3(CustomMathsLibrary.Clamp(angularAccel.x, -7.5f, -20), angularAccel.y, angularAccel.z);
+        }
+
+        print(name + " " + angularAccel);
+
         // Apply the velocity change
-        angularVelocity = CustomMathsLibrary.Add(angularVelocity, angularAccel);
+        angularVelocity = CustomMathsLibrary.Add(angularVelocity, CustomMathsLibrary.Scale(angularAccel, angularBoost));
     }
 
     // Applies gravity torque (tipping) to the pin to simulate falling over
-    private void ApplyGravityTorque(CustomMathsLibrary.Vector3 pos)
+    private void ApplyGravityTorque(ref CustomMathsLibrary.Vector3 pos)
     {
-        // Get the pin's bottom point based on rotation
         bottomPoint = GetBottomPoint(pos);
 
-        // Ground check, esentially if the pin is penetrating the ground, push it up, this stops it from getting stuck in the floor
+        // Ground collision
         if (bottomPoint.y <= WorldData.worldGroundPos)
         {
             float penetration = WorldData.worldGroundPos - bottomPoint.y;
@@ -129,25 +157,30 @@ public class BowlingPinController : MonoBehaviour
             isGrounded = false;
         }
 
-        // Applies torque to the pin if it is falling but not grounded yet
         if (!isGrounded || hasFallen) return;
 
-        // Makes the pin tip over with the use of gravity from the CustomPhysicsLibrary (-9.81)
-        CustomMathsLibrary.Vector3 gravityForce = new CustomMathsLibrary.Vector3(0, CustomPhysicsLibrary.CaculateObjectGravityForce(pinMass), 0);
+        CustomMathsLibrary.Vector3 worldUp = new CustomMathsLibrary.Vector3(0, 1, 0);
 
-        // torque = r x force
-        CustomMathsLibrary.Vector3 r = CustomMathsLibrary.Subtract(pos, bottomPoint);
-        CustomMathsLibrary.Vector3 torque = CustomMathsLibrary.CrossProduct(r, gravityForce);
+        CustomMathsLibrary.Vector3 pinUp = GetUpDir();
 
-        CustomMathsLibrary.Vector3 angularAccel = CustomMathsLibrary.Scale(torque, 1f / inertia);
+        CustomMathsLibrary.Vector3 tiltAxis = CustomMathsLibrary.CrossProduct(pinUp, worldUp);
 
-        float uprightDot = CustomMathsLibrary.Dot(GetUpDir(), up);
-        float tilt = 1f - Mathf.Clamp01(uprightDot);
+        float tiltAmount = CustomMathsLibrary.Magnitude(tiltAxis);
 
-        // Another artificial boost to make the game actually feel right
-        float tiltBoost = 1f + (tilt * tilt * 8f);
+        if (tiltAmount < 0.001f) return;
 
-        angularVelocity = CustomMathsLibrary.Add(angularVelocity, CustomMathsLibrary.Scale(angularAccel, Time.deltaTime * tiltBoost));
+        tiltAxis = CustomMathsLibrary.Normalize(tiltAxis);
+
+        // Stronger gravity tipping
+        float gravityTorqueStrength = pinMass * 35f * tiltAmount;
+
+        CustomMathsLibrary.Vector3 gravityTorque = CustomMathsLibrary.Scale( tiltAxis, gravityTorqueStrength);
+
+        // Angular acceleration
+        CustomMathsLibrary.Vector3 angularAccel = CustomMathsLibrary.Scale(gravityTorque, 1f / inertia);
+
+        // Apply
+        angularVelocity =CustomMathsLibrary.Add(angularVelocity, CustomMathsLibrary.Scale(angularAccel, Time.deltaTime));
     }
 
     // Prevents the pin from sliding / snapping depending on if it's grounded or not; more fake physics

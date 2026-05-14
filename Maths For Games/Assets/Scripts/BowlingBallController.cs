@@ -46,7 +46,6 @@ public class BowlingBallController : MonoBehaviour
     // ------ Collision Variables ------ //
 
     [Header("Ball Collisions")]
-    [SerializeField] private BowlingPinController[] pins;
     [SerializeField, Range(0f, 10f)] private float minImpulseBoost = 2f;  // minimum at 0 charge
     [SerializeField, Range(0f, 40f)] private float maxImpulseBoost = 10f; // maximum at full charge
 
@@ -56,7 +55,7 @@ public class BowlingBallController : MonoBehaviour
     }
 
     // Resets the ball's variables to being held so it can be thrown again
-    private void ResetBall()
+    public void ResetBall()
     {
         transform.position = CustomMathsLibrary.Vector3.zero;
 
@@ -181,7 +180,7 @@ public class BowlingBallController : MonoBehaviour
     // Iterate through all pins and check for collisions
     private void HandlePinCollisions(ref CustomMathsLibrary.Vector3 ballPos, ref CustomMathsLibrary.Vector3 moveDir)
     {
-        foreach (var pin in pins)
+        foreach (BowlingPinController pin in PinCollisionManager.instance.GetPins())
         {
             if (!CheckCollision(ballPos, ballRadius, pin, out var normal, out var penetration, out var hitPoint)) continue; // If a collision occurs, continue
 

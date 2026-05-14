@@ -385,7 +385,6 @@ public static class CustomMathsLibrary
     {
         float len = Magnitude(v);
 
-
         if (len > 0)
         {
             return Divide(v, len);
@@ -447,7 +446,7 @@ public static class CustomMathsLibrary
         {
             s = 0.0f;
             t = f / e;
-            t = Mathf.Clamp01(t);
+            t = Clamp(t, 0f, 1f);
         }
         else
         {
@@ -455,20 +454,20 @@ public static class CustomMathsLibrary
             if (e <= 1e-6f)
             {
                 t = 0;
-                s = Mathf.Clamp01(-c / a);
+                s = Clamp(-c / a, 0f, 1f);
             }
             else
             {
                 float b = Dot(d1, d2);
                 float denom = a * e - b * b;
 
-                if (denom != 0) s = Mathf.Clamp01((b * f - c * e) / denom);
+                if (denom != 0) s = Clamp((b * f - c * e) / denom, 0f, 1f);
                 else s = 0;
 
                 t = (b * s + f) / e;
 
-                if (t < 0.0f) { t = 0.0f; s = Mathf.Clamp01(-c / a); }
-                else if (t > 1.0f) { t = 1.0f; s = Mathf.Clamp01((b - c) / a); }
+                if (t < 0.0f) { t = 0.0f; s = Clamp(-c / a, 0f, 1f); }
+                else if (t > 1.0f) { t = 1.0f; s = Clamp((b - c) / a, 0f, 1f); }
             }
         }
 

@@ -3,7 +3,12 @@ using System.Collections.Generic;
 
 public class PinCollisionManager : MonoBehaviour
 {
+    private static PinCollisionManager Instance;
+    public static PinCollisionManager instance => Instance;
+
     [SerializeField] private List<BowlingPinController> pins;
+
+    private void Awake() { if (Instance == null) Instance = this; }
 
     private void FixedUpdate()
     {
@@ -16,20 +21,20 @@ public class PinCollisionManager : MonoBehaviour
         {
             for (int j = i + 1; j < pins.Count; j++)
             {
-                var a = pins[i];
-                var b = pins[j];
+                BowlingPinController pinA = pins[i];
+                BowlingPinController pinB = pins[j];
 
-                if (!CollisionUtility.CapsuleCapsuleCollision(a.GetBottom(), a.GetTop(), a.GetPinRadius(), b.GetBottom(), b.GetTop(), b.GetPinRadius(), out var normal, out var penetration, out var hitPoint)) continue;
+                if (!CollisionUtility.CapsuleCapsuleCollision(pinA.GetBottom(), pinA.GetTop(), pinA.GetPinRadius(), pinB.GetBottom(), pinB.GetTop(), pinB.GetPinRadius(), out CustomMathsLibrary.Vector3 normal, out float penetration, out CustomMathsLibrary.Vector3 hitPoint)) continue;
 
-                ResolvePinPenetration(a, b, normal, penetration);
-                ApplyPinImpulse(a, b, normal, hitPoint);
+                ResolvePinPenetration(pinA, pinB, normal, penetration);
+                ApplyPinImpulse(pinA, pinB, normal, hitPoint);
             }
         }
     }
 
-    private void ResolvePinPenetration(BowlingPinController a, BowlingPinController b, CustomMathsLibrary.Vector3 normal, float penetration)
+    private void ResolvePinPenetration(BowlingPinController pinA, BowlingPinController pinB, CustomMathsLibrary.Vector3 normal, float penetration)
     {
-        float totalMass = a.GetPinMass() + b.GetPinMass();
+        float totalMass = pinA.GetPinMass() + pinB.GetPinMass();
 
         penetration = Mathf.Max(penetration - 0.01f, 0f);
 
@@ -39,16 +44,16 @@ public class PinCollisionManager : MonoBehaviour
         CustomMathsLibrary.Vector3 correctionA = CustomMathsLibrary.Scale(normal, -moveA);
         CustomMathsLibrary.Vector3 correctionB = CustomMathsLibrary.Scale(normal, moveB);
 
-        a.StoreCorrectionDelta(correctionA);
-        b.StoreCorrectionDelta(correctionB);
+        pinA.StoreCorrectionDelta(correctionA);
+        pinB.StoreCorrectionDelta(correctionB);
     }
 
-    private void ApplyPinImpulse(BowlingPinController a, BowlingPinController b, CustomMathsLibrary.Vector3 normal, CustomMathsLibrary.Vector3 hitPoint)
+    private void ApplyPinImpulse(BowlingPinController pinA, BowlingPinController pinB, CustomMathsLibrary.Vector3 normal, CustomMathsLibrary.Vector3 hitPoint)
     {
-        var velA = a.pinVelocity;
-        var velB = b.pinVelocity;
+        CustomMathsLibrary.Vector3 velA = pinA.pinVelocity;
+        CustomMathsLibrary.Vector3 velB = pinB.pinVelocity;
 
-        var relativeVel = CustomMathsLibrary.Subtract(velA, velB);
+        CustomMathsLibrary.Vector3 relativeVel = CustomMathsLibrary.Subtract(velA, velB);
 
         float separatingVel = CustomMathsLibrary.Dot(relativeVel, normal);
 
@@ -57,11 +62,21 @@ public class PinCollisionManager : MonoBehaviour
         float restitution = 0.25f;
 
         float impulseScalar = -(1f + restitution) * separatingVel;
-        impulseScalar /= (1f / a.GetPinMass()) + (1f / b.GetPinMass());
+        impulseScalar /= (1f / pinA.GetPinMass()) + (1f / pinB.GetPinMass());
 
-        var impulse = CustomMathsLibrary.Scale(normal, impulseScalar);
+        CustomMathsLibrary.Vector3 impulse = CustomMathsLibrary.Scale(normal, impulseScalar);
 
-        a.ApplyCollisionImpulse(impulse, hitPoint);
-        b.ApplyCollisionImpulse(CustomMathsLibrary.Scale(impulse, -1f), hitPoint);
+        pinA.ApplyCollisionImpulse(impulse, hitPoint);
+        pinB.ApplyCollisionImpulse(CustomMathsLibrary.Scale(impulse, -1f), hitPoint);
     }
+
+    public void ResetPins()
+    {
+        foreach(BowlingPinController pin in pins)
+        {
+            pin.ResetPin();
+        }
+    }
+
+    public List<BowlingPinController> GetPins() { return pins; }
 }
