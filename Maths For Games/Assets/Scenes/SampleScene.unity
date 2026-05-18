@@ -1757,8 +1757,8 @@ MonoBehaviour:
   appliedThrowCharge: 0
   ballMass: 8
   ballRadius: 0.5
-  ballRollSpeed: 1.5
-  ballMinRollSpeed: 1.5
+  ballRollSpeed: 2
+  ballMinRollSpeed: 2
   verticalVelocity: 0
   minImpulseBoost: 5
   maxImpulseBoost: 25

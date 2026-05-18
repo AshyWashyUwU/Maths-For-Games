@@ -239,32 +239,6 @@ public static class CustomMathsLibrary
         {
             return new Quaternion(x, y, z, w);
         }
-
-        // Builds a quaternion from euler angles by using half-angle trigonometry before combining them
-        public static Quat Euler(float xDeg, float yDeg, float zDeg)
-        {
-            float xRad = CustomMathsLibrary.DegreesToRadians(xDeg);
-            float yRad = CustomMathsLibrary.DegreesToRadians(yDeg);
-            float zRad = CustomMathsLibrary.DegreesToRadians(zDeg);
-
-            float cx = Mathf.Cos(xRad * 0.5f);
-            float sx = Mathf.Sin(xRad * 0.5f);
-
-            float cy = Mathf.Cos(yRad * 0.5f);
-            float sy = Mathf.Sin(yRad * 0.5f);
-
-            float cz = Mathf.Cos(zRad * 0.5f);
-            float sz = Mathf.Sin(zRad * 0.5f);
-
-            Quat q = new Quat(0, 0, 0, 0);
-
-            q.w = (cx * cy * cz) + (sx * sy * sz);
-            q.x = (sx * cy * cz) - (cx * sy * sz);
-            q.y = (cx * sy * cz) + (sx * cy * sz);
-            q.z = (cx * cy * sz) - (sx * sy * cz);
-
-            return q;
-        }
     }
 
     // ------------------------------------ VECTOR2 MATH ------------------------------------ // 
@@ -391,7 +365,7 @@ public static class CustomMathsLibrary
         }
         else
         {
-            return new Vector3(0f, 0f, 0f);
+            return Vector3.zero;
         }
     }
 
@@ -436,7 +410,7 @@ public static class CustomMathsLibrary
 
         if (a <= 1e-6f && e <= 1e-6f)
         {
-            s = t = 0.0f;
+            s = t = 0;
             c1 = p1;
             c2 = p2;
             return;
@@ -444,9 +418,9 @@ public static class CustomMathsLibrary
 
         if (a <= 1e-6f)
         {
-            s = 0.0f;
+            s = 0;
             t = f / e;
-            t = Clamp(t, 0f, 1f);
+            t = Clamp(t, 0, 1f);
         }
         else
         {
@@ -454,20 +428,20 @@ public static class CustomMathsLibrary
             if (e <= 1e-6f)
             {
                 t = 0;
-                s = Clamp(-c / a, 0f, 1f);
+                s = Clamp(-c / a, 0, 1f);
             }
             else
             {
                 float b = Dot(d1, d2);
                 float denom = a * e - b * b;
 
-                if (denom != 0) s = Clamp((b * f - c * e) / denom, 0f, 1f);
+                if (denom != 0) s = Clamp((b * f - c * e) / denom, 0, 1f);
                 else s = 0;
 
                 t = (b * s + f) / e;
 
-                if (t < 0.0f) { t = 0.0f; s = Clamp(-c / a, 0f, 1f); }
-                else if (t > 1.0f) { t = 1.0f; s = Clamp((b - c) / a, 0f, 1f); }
+                if (t < 0) { t = 0; s = Clamp(-c / a, 0, 1f); }
+                else if (t > 1f) { t = 1f; s = Clamp((b - c) / a, 0, 1f); }
             }
         }
 
@@ -592,7 +566,7 @@ public static class CustomMathsLibrary
     // Creates direction vector from angles
     public static Vector3 ForwardFromYawPitch(float yawRadians, float pitchRadians)
     {
-        Vector3 f = new Vector3(0f, 0f, 0f);
+        Vector3 f = Vector3.zero;
 
         f.x = Mathf.Sin(yawRadians) * Mathf.Cos(pitchRadians);
         f.y = Mathf.Sin(pitchRadians);
@@ -604,7 +578,7 @@ public static class CustomMathsLibrary
     // Returns a perpendicular vector
     public static Vector3 CrossProduct(Vector3 a, Vector3 b)
     {
-        Vector3 f = new Vector3(0f, 0f, 0f);
+        Vector3 f = Vector3.zero;
 
         f.x = (a.y * b.z) - (a.z * b.y);
         f.y = (a.z * b.x) - (a.x * b.z);
