@@ -282,12 +282,12 @@ public class BowlingBallController : MonoBehaviour
         else
         {
             // Caculates the ball's overall speed and surface area
-            float speed = CustomMathsLibrary.Magnitude(moveDir);
+            float moveDirSpeed = CustomMathsLibrary.Magnitude(moveDir);
             float area = Mathf.PI * ballRadius * ballRadius;
 
-            // Caculates the drag force using the CustomPhysicsLibrary by combining speed and area
+            // Caculates the drag force using the CustomPhysicsLibrary by combining moveDirSpeed and area
             // Drag becomes simplified
-            float dragForce = CustomPhysicsLibrary.CaculateObjectDragForce(speed, area);
+            float dragForce = CustomPhysicsLibrary.CaculateObjectDragForce(moveDirSpeed, area);
 
             // Caculates the ball's final drag force by combining the inital dragforce with the ball's mass
             float finalDrag = dragForce / ballMass;
@@ -321,11 +321,11 @@ public class BowlingBallController : MonoBehaviour
 
         // Reduce rotation speed in air based on AIR_DENSITY
         float resistance = isGrounded ? 1f : CustomPhysicsLibrary.AIR_DENSITY;
-        float speed = CustomMathsLibrary.Magnitude(moveDir);
+        float moveDirSpeed = CustomMathsLibrary.Magnitude(moveDir);
 
         // Compute the final angle of the ball by dividing the speed of the ball (speed) with the radius of the ball (radius) This makes it so that the larger the ball; the slower it goes
         // Then multiply this by the air resistance (resistance)
-        float finalAngle = (speed / ballRadius) * Time.deltaTime * resistance;
+        float finalAngle = (moveDirSpeed / ballRadius) * Time.deltaTime * resistance;
 
         // Create a new quaternion that combines the axis and the final angle
         CustomMathsLibrary.Quat rotationQuat = new CustomMathsLibrary.Quat(axis, finalAngle);

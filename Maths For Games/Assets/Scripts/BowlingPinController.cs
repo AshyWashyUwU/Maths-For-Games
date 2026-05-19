@@ -92,13 +92,13 @@ public class BowlingPinController : MonoBehaviour
 
         ApplyDamping();
 
-        //if (!hasFallen) { CheckFallen(); ApplyAngularRotation(); }
+        if (!hasFallen) { CheckFallen(); ApplyAngularRotation(); }
 
         CorrectPosition(ref pos);
 
         ApplyConstraints(ref pos);
 
-        //if (hasFallen) { ConstrainRotation(); }
+        if (hasFallen) { ConstrainRotation(); }
 
         if (hasCorrection) ApplyCollisionCorrection(ref pos);
 
@@ -133,8 +133,6 @@ public class BowlingPinController : MonoBehaviour
         {
             angularAccel = new CustomMathsLibrary.Vector3(CustomMathsLibrary.Clamp(angularAccel.x, -7.5f, -20), angularAccel.y, angularAccel.z);
         }
-
-        print(name + " " + angularAccel);
 
         // Apply the velocity change
         angularVelocity = CustomMathsLibrary.Add(angularVelocity, CustomMathsLibrary.Scale(angularAccel, angularBoost));
