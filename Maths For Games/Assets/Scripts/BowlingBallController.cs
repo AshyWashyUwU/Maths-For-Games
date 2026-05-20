@@ -3,7 +3,7 @@ using UnityEngine.InputSystem;
 
 public class BowlingBallController : MonoBehaviour
 {
-    private bool thrownBall, isGrounded, isCharging; // Keeps track of the ball's "phase" (thrown, grounded, charging)
+    private bool thrownBall, isGrounded, isCharging; // Keeps track of the ball's "phases" (thrown, grounded, charging)
 
     // ------ Holding Variables ------ //
 
@@ -15,7 +15,8 @@ public class BowlingBallController : MonoBehaviour
     private CustomMathsLibrary.Vector3 startPos; // Stored start position
     private float yawDegrees; // The stored aiming angle (when turning with W/S)
 
-    private Vector2 moveInput, rotateInput; // Input that decides the ball's movement and rotation (WASD)
+    private Vector2 moveInput, rotateInput; // Input that decides the ball's movement and rotation (WASD) 
+    // ALSO, I couldn't find a way to make it so that the input system would return Custom Vector2's, so that's why they're just Unity Vector2's
 
     [Header("Ball Charge Variables")]
     [Range(1, 10)]   [SerializeField] private float ballChargeSpeed = 3f; // How quickly the ball's charge fills when about to throw
@@ -30,8 +31,8 @@ public class BowlingBallController : MonoBehaviour
     // ------ Moving Variables ------ //
 
     [Header("Ball Moving Variables")]
-    [Range(0, 10f)]  [SerializeField] private float ballMass = 8f; // The "weight" of the ball which affects gravity force and drag
-    [Range(0, 1)]    [SerializeField] private float ballRadius = 0.5f; // The "size" of the ball which affects drag / rotation and how far away the ball is from the ground (TO DO)
+    [Range(0, 10f)]  [SerializeField] private float ballMass = 8f; // The "weight" of the ball which affects gravity force, drag, collisions and how quickly the ball rolls
+    [Range(0, 1)]    [SerializeField] private float ballRadius = 0.5f; // The "size" of the ball which affects drag / rotation and how far away the ball is from the ground
     [Range(1, 5)]    [SerializeField] private float ballRollSpeed = 1.5f; // The ball's speed (based on forward)
     [Range(1, 5)]    [SerializeField] private float ballMinRollSpeed = 1.5f; // Prevents the ball from stopping entirely / going backwards (used to prevent softlock)
 
@@ -152,7 +153,6 @@ public class BowlingBallController : MonoBehaviour
         // 10. Push the final pos to the transform (ApplyTransform)
         // 11. If the final pos.z >= than the laneDepth, reset the ball entirely (ResetBall)
 
-        // x = x + v * dt
         CustomMathsLibrary.Vector3 pos = transform.position; 
         pos = CustomMathsLibrary.Add(pos, new CustomMathsLibrary.Vector3(0, 0, -currentPullback));
 
@@ -203,7 +203,7 @@ public class BowlingBallController : MonoBehaviour
         // hookStrength = (speed * 0.25) * timeFactor
         float hookStrength = hookSpeed * 0.25f;
 
-        // POTENTAL FIX: only applies when the hookdirection != 0, returns Mathf.Sign(closest side (closestSide)) so a 0 or a 1
+        // POTENTAL FIX: only applies when the hookdirection != 0, if it is 0, it just picks a random lane
 
         if (hookDirection == 0)
         {
@@ -253,6 +253,7 @@ public class BowlingBallController : MonoBehaviour
         CustomMathsLibrary.Vector3 velocity = CustomMathsLibrary.Scale(moveDir, thrownBall ? ballRollSpeed : ballHoldMoveSpeed);
 
         // Returns the new position by adding the velocity onto the old position  
+        // x = x + v * dt
         return CustomMathsLibrary.Add(pos, CustomMathsLibrary.Scale(velocity, Time.deltaTime));
     }
 
@@ -364,15 +365,15 @@ public class BowlingBallController : MonoBehaviour
             if (!CheckCollision(ballPos, ballRadius, pin, out var normal, out var penetration, out var hitPoint)) continue; // If a collision occurs, continue
 
             // Resolve penetration (push ball out of pin)
-            ResolveBallPenetration(ref ballPos, normal, penetration);
+            ApplyBallPenetration(ref ballPos, normal, penetration);
 
             // Compute impact strength based on ball velocity and surface normal
             CustomMathsLibrary.Vector3 impactNormal = CustomMathsLibrary.Scale(normal, -1f);
-            float impactStrength = ComputeImpactStrength(moveDir, impactNormal);
+            float impactStrength = FindBallImpactStrength(moveDir, impactNormal);
 
             // Apply impulse to pin and ball based on physics
             if (impactStrength <= 0f) continue;
-            ApplyCollisionImpulse(pin, ref moveDir, moveDir, impactNormal, hitPoint);
+            ApplyCollisionImpulse(pin, ref moveDir, impactNormal, hitPoint);
         }
     }
 
@@ -383,14 +384,14 @@ public class BowlingBallController : MonoBehaviour
     }
 
     // Pushes the ball outside of the pin by moving along the collision normal by the penetration depth
-    private void ResolveBallPenetration(ref CustomMathsLibrary.Vector3 ballPos, CustomMathsLibrary.Vector3 normal, float penetration)
+    private void ApplyBallPenetration(ref CustomMathsLibrary.Vector3 ballPos, CustomMathsLibrary.Vector3 normal, float penetration)
     {
         // Makes sure the ball doesn't clip into the pin
         ballPos = CustomMathsLibrary.Add(ballPos, CustomMathsLibrary.Scale(normal, penetration));
     }
 
     // Compute a normalized dot product between ball movement and collision normal
-    private float ComputeImpactStrength(CustomMathsLibrary.Vector3 moveDir, CustomMathsLibrary.Vector3 impactNormal)
+    private float FindBallImpactStrength(CustomMathsLibrary.Vector3 moveDir, CustomMathsLibrary.Vector3 impactNormal)
     {
         CustomMathsLibrary.Vector3 ballDir = CustomMathsLibrary.Normalize(moveDir);
         float impactStrength = CustomMathsLibrary.Dot(ballDir, impactNormal); // Returns 0 if glancing, 1 if direct impact
@@ -398,47 +399,47 @@ public class BowlingBallController : MonoBehaviour
     }
 
     // Apply relative velocity between the ball and pin
-    private void ApplyCollisionImpulse(BowlingPinController pin, ref CustomMathsLibrary.Vector3 moveDir, CustomMathsLibrary.Vector3 moveDirOriginal, CustomMathsLibrary.Vector3 impactNormal, CustomMathsLibrary.Vector3 hitPoint)
+    private void ApplyCollisionImpulse(BowlingPinController pin, ref CustomMathsLibrary.Vector3 moveDir, CustomMathsLibrary.Vector3 impactNormal, CustomMathsLibrary.Vector3 hitPoint)
     {
-        float speed = CustomMathsLibrary.Magnitude(moveDirOriginal);
+        float speed = CustomMathsLibrary.Magnitude(moveDir);
 
-        CustomMathsLibrary.Vector3 ballVel = CustomMathsLibrary.Scale(CustomMathsLibrary.Normalize(moveDirOriginal), speed);
+        CustomMathsLibrary.Vector3 ballVel = CustomMathsLibrary.Scale(CustomMathsLibrary.Normalize(moveDir), speed);
         CustomMathsLibrary.Vector3 pinVel = pin.pinVelocity;
 
         // Find the seperating velocity along the impact normal
         CustomMathsLibrary.Vector3 relativeVel = CustomMathsLibrary.Subtract(ballVel, pinVel);
         float seperatingVel = CustomMathsLibrary.Dot(relativeVel, impactNormal);
 
-        if (seperatingVel <= 0f) return; // return if the ball is moving away
+        if (seperatingVel <= 0f) return; // if the ball is moving away, stop
 
-        // Caculate the impulse scalar using restitution (bounciness) and mass
+        // Caculates the impulse scalar using restitution (bounciness) and mass
         // Uses the standard collision impulse equation
         float restitution = 0.7f;
         float impulseScalar = (1f + restitution) * seperatingVel;
         impulseScalar /= (1f / ballMass) + (1f / pin.GetPinMass());
 
-        float normalizedCharge = Mathf.Clamp01(throwCharge / 0.3f); 
+        float normalizedCharge = Mathf.Clamp01(throwCharge / 0.75f); 
 
-        // Map it to an impulse boost
+        // Lerps it to an impulse boost
         float impulseBoost = Mathf.Lerp(minImpulseBoost, maxImpulseBoost, normalizedCharge);
 
         impulseScalar *= impulseBoost;
 
-        // Scale impulse across the normal of the impact
+        // Scales impulse across the normal of the impact
         CustomMathsLibrary.Vector3 collisionImpulse = CustomMathsLibrary.Scale(impactNormal, impulseScalar);
 
-        // Apply impulse with the hit point of the ball between the pin (hitPoint)
+        // Applys impulse with the hit point of the ball between the pin (hitPoint)
         pin.ApplyCollisionImpulse(collisionImpulse, hitPoint);
 
-        // Apply inverse impulse to the ball, updating the move direction (moveDir)
-        CustomMathsLibrary.Vector3 ballVelChange = CustomMathsLibrary.Scale(collisionImpulse, -1f / ballMass);
+        // Applys inverse impulse to the ball, updating the move direction (moveDir)
+        CustomMathsLibrary.Vector3 ballVelChange = CustomMathsLibrary.Scale(collisionImpulse, -(1f / ballMass));
         moveDir = CustomMathsLibrary.Add(moveDir, ballVelChange);
     }
 
     // Applies the final transform of the ball with the position (pos) of the ball as an input
     private void ApplyTransform(CustomMathsLibrary.Vector3 pos)
     {
-        // The yaw rotation (yawRot) handles the aiming direction
+        // The yaw rotation (yawRot) handles the aiming direction is converted into a quaternion
         float yawRadians = CustomMathsLibrary.DegreesToRadians(yawDegrees);
         CustomMathsLibrary.Quat yawRot = new CustomMathsLibrary.Quat(new Vector3(0f, 1f, 0f), yawRadians);
 

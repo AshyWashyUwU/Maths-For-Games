@@ -9,14 +9,13 @@ public class CollisionUtility : MonoBehaviour
         hitPoint = closestPoint;
 
         CustomMathsLibrary.Vector3 delta = CustomMathsLibrary.Subtract(sphereCenter, closestPoint);
-
-        float dist = CustomMathsLibrary.Magnitude(delta);
+        float distance = CustomMathsLibrary.Magnitude(delta);
         float totalRadius = sphereRadius + capsuleRadius;
 
-        if (dist < totalRadius)
+        if (distance < totalRadius)
         {
             collisionNormal = CustomMathsLibrary.Normalize(delta);
-            penetrationDepth = totalRadius - dist;
+            penetrationDepth = totalRadius - distance;
             return true;
         }
 
@@ -31,13 +30,13 @@ public class CollisionUtility : MonoBehaviour
         CustomMathsLibrary.ClosestPointsBetweenSegments(a1, a2, b1, b2, out p1, out p2);
 
         CustomMathsLibrary.Vector3 delta = CustomMathsLibrary.Subtract(p2, p1);
-        float dist = CustomMathsLibrary.Magnitude(delta);
+        float distance = CustomMathsLibrary.Magnitude(delta);
         float totalRadius = radiusA + radiusB;
 
-        if (dist < totalRadius)
+        if (distance < totalRadius)
         {
             collisionNormal = CustomMathsLibrary.Normalize(delta);
-            penetrationDepth = totalRadius - dist;
+            penetrationDepth = totalRadius - distance;
             hitPoint = CustomMathsLibrary.Scale(CustomMathsLibrary.Add(p1, p2), 0.5f);
             return true;
         }

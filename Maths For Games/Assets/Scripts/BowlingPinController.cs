@@ -169,7 +169,7 @@ public class BowlingPinController : MonoBehaviour
 
         tiltAxis = CustomMathsLibrary.Normalize(tiltAxis);
 
-        // Stronger gravity tipping
+        // Artificial gravity strength tipping
         float gravityTorqueStrength = pinMass * 35f * tiltAmount;
 
         CustomMathsLibrary.Vector3 gravityTorque = CustomMathsLibrary.Scale( tiltAxis, gravityTorqueStrength);
@@ -177,7 +177,7 @@ public class BowlingPinController : MonoBehaviour
         // Angular acceleration
         CustomMathsLibrary.Vector3 angularAccel = CustomMathsLibrary.Scale(gravityTorque, 1f / inertia);
 
-        // Apply
+        // Apply velocity
         angularVelocity =CustomMathsLibrary.Add(angularVelocity, CustomMathsLibrary.Scale(angularAccel, Time.deltaTime));
     }
 

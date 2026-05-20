@@ -57,9 +57,9 @@ public class PinCollisionManager : MonoBehaviour
 
         float separatingVel = CustomMathsLibrary.Dot(relativeVel, normal);
 
-        if (separatingVel > 0f) return;
+        if (separatingVel <= 0f) return;
 
-        float restitution = 0.25f;
+        float restitution = 0.7f;
 
         float impulseScalar = -(1f + restitution) * separatingVel;
         impulseScalar /= (1f / pinA.GetPinMass()) + (1f / pinB.GetPinMass());
