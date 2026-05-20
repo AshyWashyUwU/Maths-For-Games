@@ -381,72 +381,77 @@ public static class CustomMathsLibrary
         return Add(startPos, Scale(Subtract(endPos, startPos), t));
     }
 
+    // ------------------------------------ COLLISION VECTOR3 MATH ------------------------------------ // 
+
+    // 1. Compute vectors representing the segment and the vector from the start of the segment to the target point
+    // 2. Use dot product to project the point (p) onto the line of the segment
+    // 3. Clamp the result so that the point is actually on the segment
+    // 4. Return the point along the segment corresponding to the projection
+
+    // Returns the closest point on the line segment [a, b] to a given point, p
     public static Vector3 ClosestPointOnSegment(Vector3 a, Vector3 b, Vector3 p)
     {
+        // Vector from point a to point b
         Vector3 ab = Subtract(b, a);
+
+        // Vector from point a to point p
         Vector3 ap = Subtract(p, a);
 
+        // Squared length of the segment
         float ab2 = Dot(ab, ab);
 
-        if (ab2 == 0) return a;
-
+        // Project vector ap onto ab to get how far along the segment the closest point is
         float t = Dot(ap, ab) / ab2;
+
+        // Clamp [0, 1] to make sure the point is actually on the segment
         t = Clamp(t, 0f, 1f);
 
+        // Return the clostest point as a + t * (b - a)
         return Add(a, Scale(ab, t));
     }
 
+    // 1. Represent each segment as a parametric line
+    // 2. Compute direction and offset vectors
+    // 3. Compute dot products to project vectors and measure alignment
+    // 4. Solve for initial parameters f and g that minimize distance
+    // 5. Clamp g to [0, 1] and adjust f if necessary
+    // 6. Compute the final closest points in 3D space
+
     public static void ClosestPointsBetweenSegments(Vector3 p1, Vector3 q1, Vector3 p2, Vector3 q2, out Vector3 c1, out Vector3 c2)
     {
+        // Direction vectors of each segment
         Vector3 d1 = Subtract(q1, p1);
         Vector3 d2 = Subtract(q2, p2);
+
+        // Vector between segment starts
         Vector3 r = Subtract(p1, p2);
 
+        // Squared legnth of segment 1
         float a = Dot(d1, d1);
-        float e = Dot(d2, d2);
-        float f = Dot(d2, r);
 
-        float s, t;
+        // Squared legnth of segment 2
+        float b = Dot(d1, d2);
 
-        if (a <= 1e-6f && e <= 1e-6f)
-        {
-            s = t = 0;
-            c1 = p1;
-            c2 = p2;
-            return;
-        }
+        // Projection of r onto segment 1
+        float c = Dot(d1, r);
 
-        if (a <= 1e-6f)
-        {
-            s = 0;
-            t = f / e;
-            t = Clamp(t, 0, 1f);
-        }
-        else
-        {
-            float c = Dot(d1, r);
-            if (e <= 1e-6f)
-            {
-                t = 0;
-                s = Clamp(-c / a, 0, 1f);
-            }
-            else
-            {
-                float b = Dot(d1, d2);
-                float denom = a * e - b * b;
+        // Squared length of segment 2
+        float d = Dot(d2, d2);
 
-                if (denom != 0) s = Clamp((b * f - c * e) / denom, 0, 1f);
-                else s = 0;
+        // Projection of r onto segment 2
+        float e = Dot(d2, r);
 
-                t = (b * s + f) / e;
+        // Points along each segment
+        float f = 0f;
+        float g = (b * f + e) / d;
 
-                if (t < 0) { t = 0; s = Clamp(-c / a, 0, 1f); }
-                else if (t > 1f) { t = 1f; s = Clamp((b - c) / a, 0, 1f); }
-            }
-        }
+        // Clamp the points so that they are actually on the segments 
+        if (g < 0) { g = 0; f = Clamp(-c / a, 0, 1f); }
+        else if (g > 1f) { g = 1f; f = Clamp((b - c) / a, 0, 1f); }
 
-        c1 = Add(p1, Scale(d1, s));
-        c2 = Add(p2, Scale(d2, t));
+        // Find actual closest points
+        c1 = Add(p1, Scale(d1, f));
+        c2 = Add(p2, Scale(d2, g));
     }
 
     // ------------------------------------ VECTOR4 MATH ------------------------------------ // 

@@ -50,8 +50,8 @@ public class PinCollisionManager : MonoBehaviour
 
     private void ApplyPinImpulse(BowlingPinController pinA, BowlingPinController pinB, CustomMathsLibrary.Vector3 normal, CustomMathsLibrary.Vector3 hitPoint)
     {
-        CustomMathsLibrary.Vector3 velA = pinA.pinVelocity;
-        CustomMathsLibrary.Vector3 velB = pinB.pinVelocity;
+        CustomMathsLibrary.Vector3 velA = pinA.GetPinVelocity();
+        CustomMathsLibrary.Vector3 velB = pinB.GetPinVelocity();
 
         CustomMathsLibrary.Vector3 relativeVel = CustomMathsLibrary.Subtract(velA, velB);
 

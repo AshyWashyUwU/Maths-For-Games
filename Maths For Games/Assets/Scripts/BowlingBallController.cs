@@ -12,17 +12,17 @@ public class BowlingBallController : MonoBehaviour
     [Range(0, 3)]    [SerializeField] private float ballRotateSpeed = 1f; // How fast the ball turns on the yaw axis when being held (uses W/S to turn)
     [Range(0, 90)]   [SerializeField] private float ballMaxRotation = 45f; // The maxiumum distance the ball can be aimed on the yaw
 
-    private CustomMathsLibrary.Vector3 startPos; // Stored start position
-    private float yawDegrees; // The stored aiming angle (when turning with W/S)
+    private CustomMathsLibrary.Vector3 startPos = CustomMathsLibrary.Vector3.zero; // Stored start position
+    private float yawDegrees; // The stored aiming angle in degrees (set when turning with W/S)
 
     private Vector2 moveInput, rotateInput; // Input that decides the ball's movement and rotation (WASD) 
-    // ALSO, I couldn't find a way to make it so that the input system would return Custom Vector2's, so that's why they're just Unity Vector2's
+    // POSSIBLE FIX: I couldn't find a way to make it so that the input system would return Custom Vector2s, so that's why they're just Unity's Vector2s
 
     [Header("Ball Charge Variables")]
-    [Range(1, 10)]   [SerializeField] private float ballChargeSpeed = 3f; // How quickly the ball's charge fills when about to throw
-    [Range(0.1f, 1)] [SerializeField] private float maxPullbackDistance = 0.25f; // How far the ball can (visually) be pulled back
-    [Range(1, 10)]   [SerializeField] private float pullbackSmoothing = 5f; // For lerp / visual effect
-    [Range(0, 3)]    [SerializeField] private float maxThrowForce = 2; // The maximum force the ball can be thrown (affects speed later on)
+    [Range(1f, 10f)]   [SerializeField] private float ballChargeSpeed = 3f; // How quickly the ball's charge fills when about to throw
+    [Range(0.1f, 1f)] [SerializeField] private float maxPullbackDistance = 0.25f; // How far the ball can (visually) be pulled back
+    [Range(1f, 10f)]   [SerializeField] private float pullbackSmoothing = 5f; // For lerp / visual effect
+    [Range(0f, 3f)]    [SerializeField] private float maxThrowForce = 2; // The maximum force the ball can be thrown (affects speed later on)
 
     public float throwCharge; // The current charge of the ball
     public float appliedThrowCharge; // The throw charge force that is applied after release
@@ -31,25 +31,25 @@ public class BowlingBallController : MonoBehaviour
     // ------ Moving Variables ------ //
 
     [Header("Ball Moving Variables")]
-    [Range(0, 10f)]  [SerializeField] private float ballMass = 8f; // The "weight" of the ball which affects gravity force, drag, collisions and how quickly the ball rolls
-    [Range(0, 1)]    [SerializeField] private float ballRadius = 0.5f; // The "size" of the ball which affects drag / rotation and how far away the ball is from the ground
-    [Range(1, 5)]    [SerializeField] private float ballRollSpeed = 1.5f; // The ball's speed (based on forward)
-    [Range(1, 5)]    [SerializeField] private float ballMinRollSpeed = 1.5f; // Prevents the ball from stopping entirely / going backwards (used to prevent softlock)
+    [Range(0f, 10f)]   [SerializeField] private float ballMass = 8f; // The "weight" of the ball which affects gravity force, drag, collisions and how quickly the ball rolls
+    [Range(0f, 1f)]    [SerializeField] private float ballRadius = 0.5f; // The "size" of the ball which affects drag / rotation and how far away the ball is from the ground / collisions
+    [Range(1f, 5f)]    [SerializeField] private float ballRollSpeed = 2f; // The ball's speed (based on forward)
+    [Range(1f, 5f)]    [SerializeField] private float ballMinRollSpeed = 2f; // Prevents the ball from stopping entirely / going backwards (used to prevent softlock)
 
     private float verticalVelocity; // The velocity of the ball (affected by gravity)
     private float hookDirection; // Stored left/right curve of the ball
-    private float elapsedRollingTime; // The total time the ball has been rolling since being released
+    private float elapsedRollingTime; // The total time the ball has been rolling since being thrown
 
     private CustomMathsLibrary.Quat currentRotation = new CustomMathsLibrary.Quat(1, 0, 0, 0); // Stored quaternion for the ball spin
-
-    private CustomMathsLibrary.Vector3 up = new CustomMathsLibrary.Vector3(0, 1, 0); // World up
+    private CustomMathsLibrary.Vector3 up = new CustomMathsLibrary.Vector3(0, 1, 0); // Quaternion world up
 
     // ------ Collision Variables ------ //
 
     [Header("Ball Collisions")]
-    [SerializeField, Range(0f, 10f)] private float minImpulseBoost = 2f;  // minimum at 0 charge
-    [SerializeField, Range(0f, 40f)] private float maxImpulseBoost = 10f; // maximum at full charge
+    [SerializeField, Range(0f, 10f)] private float minImpulseBoost = 5f;  // minimum at 0 charge
+    [SerializeField, Range(0f, 40f)] private float maxImpulseBoost = 15f; // maximum at full charge
 
+    // Reset ball on start for safety
     private void Start()
     {
         ResetBall();
@@ -58,7 +58,7 @@ public class BowlingBallController : MonoBehaviour
     // Resets the ball's variables to being held so it can be thrown again
     public void ResetBall()
     {
-        transform.position = CustomMathsLibrary.Vector3.zero;
+        transform.position = startPos;
 
         thrownBall = false;
         isGrounded = false;
@@ -103,7 +103,7 @@ public class BowlingBallController : MonoBehaviour
             isCharging = true;
         }
 
-        // Adds some force to upward and forward motion when the SPACE key is released (based on ball mass)
+        // Adds some force to upward and forward motion when the SPACE key is released (based on ball mass and charge)
         // More mass = less velocity
         // More charge = more velocity
 
@@ -193,18 +193,16 @@ public class BowlingBallController : MonoBehaviour
 
         // Creates a time-based bowling curve by clamping the hook time (hookTime)
         // Hook starts weak -> gets stronger overtime
-        // hookTime = min(1, t * 0.5)
         float hookTime = CustomMathsLibrary.Clamp(elapsedRollingTime * 0.5f, 0, 1);
 
-        // Speed has an influence on the hook.
+        // Speed has an influence on the hook
         // More speed -> stronger hook
         float hookSpeed = ballRollSpeed + (appliedThrowCharge * 0.15f);
 
         // hookStrength = (speed * 0.25) * timeFactor
         float hookStrength = hookSpeed * 0.25f;
 
-        // POTENTAL FIX: only applies when the hookdirection != 0, if it is 0, it just picks a random lane
-
+        // POSSIBLE FIX: only applies when the hookdirection != 0, if it is 0, it just picks a random lane from left/right, wasn't sure how to fix that
         if (hookDirection == 0)
         {
             CustomMathsLibrary.Vector3 laneRight = new CustomMathsLibrary.Vector3(1,0,0);
@@ -252,11 +250,12 @@ public class BowlingBallController : MonoBehaviour
         // v -> d ^ * s
         CustomMathsLibrary.Vector3 velocity = CustomMathsLibrary.Scale(moveDir, thrownBall ? ballRollSpeed : ballHoldMoveSpeed);
 
-        // Returns the new position by adding the velocity onto the old position  
+        // Returns the new position by adding the velocity onto the old position (standard vel equation)
         // x = x + v * dt
         return CustomMathsLibrary.Add(pos, CustomMathsLibrary.Scale(velocity, Time.deltaTime));
     }
 
+    // Applies various physics interactions with the ball such as gravity and drag
     private CustomMathsLibrary.Vector3 ApplyPhysics(CustomMathsLibrary.Vector3 pos, CustomMathsLibrary.Vector3 moveDir)
     {
         if (!isGrounded)
@@ -267,8 +266,10 @@ public class BowlingBallController : MonoBehaviour
 
             pos.y += verticalVelocity * Time.deltaTime;
 
+            // Find the bottom point of the ball based on the radius
             float bottomPoint = pos.y - ballRadius;
 
+            // Snap the bottom point to the world bottom point if it is lower than the worldGroundPos
             if (bottomPoint <= WorldData.worldGroundPos)
             {
                 pos.y = WorldData.worldGroundPos + ballRadius;
@@ -305,7 +306,7 @@ public class BowlingBallController : MonoBehaviour
             if (ballRollSpeed < ballMinRollSpeed) ballRollSpeed = ballMinRollSpeed;
         }
 
-        return pos;
+        return pos; // New pos
     }
 
     // Applies the ball's rotation by using a Quat instead of euler angles
@@ -331,7 +332,7 @@ public class BowlingBallController : MonoBehaviour
         // Create a new quaternion that combines the axis and the final angle
         CustomMathsLibrary.Quat rotationQuat = new CustomMathsLibrary.Quat(axis, finalAngle);
 
-        // Apply the finished quaternion to the current rotation
+        // Apply the finished quaternion to the current rotation, storing it for later
         currentRotation = rotationQuat * currentRotation;
     }
 
@@ -345,6 +346,7 @@ public class BowlingBallController : MonoBehaviour
     // More charge = ball moves backward more until hitting the limit
     private CustomMathsLibrary.Vector3 ApplyChargeForce(CustomMathsLibrary.Vector3 pos)
     {
+        // Caculate target pullback and charge percent
         float chargePercent = throwCharge / maxThrowForce;
         float targetPullback = -chargePercent * maxPullbackDistance;
 
@@ -367,7 +369,7 @@ public class BowlingBallController : MonoBehaviour
             // Resolve penetration (push ball out of pin)
             ApplyBallPenetration(ref ballPos, normal, penetration);
 
-            // Compute impact strength based on ball velocity and surface normal
+            // Find the impact strength based on ball velocity and surface normal
             CustomMathsLibrary.Vector3 impactNormal = CustomMathsLibrary.Scale(normal, -1f);
             float impactStrength = FindBallImpactStrength(moveDir, impactNormal);
 
@@ -389,13 +391,12 @@ public class BowlingBallController : MonoBehaviour
         // Makes sure the ball doesn't clip into the pin
         CustomMathsLibrary.Vector3 correction = CustomMathsLibrary.Scale(normal, penetration);
 
-        // Prevent pushing ball into the ground
-        if (correction.y < 0f) correction.y = 0f;
+        correction.y = 0f; // Prevent pushing ball into the ground if a capsule falls onto it, pushes capsule away further
 
         ballPos = CustomMathsLibrary.Add(ballPos, correction);
     }
 
-    // Compute a normalized dot product between ball movement and collision normal
+    // Does a normalized dot product between ball movement and collision normal to find the impact strength
     private float FindBallImpactStrength(CustomMathsLibrary.Vector3 moveDir, CustomMathsLibrary.Vector3 impactNormal)
     {
         CustomMathsLibrary.Vector3 ballDir = CustomMathsLibrary.Normalize(moveDir);
@@ -408,8 +409,9 @@ public class BowlingBallController : MonoBehaviour
     {
         float speed = CustomMathsLibrary.Magnitude(moveDir);
 
+        // Gets ball and pin velocity
         CustomMathsLibrary.Vector3 ballVel = CustomMathsLibrary.Scale(CustomMathsLibrary.Normalize(moveDir), speed);
-        CustomMathsLibrary.Vector3 pinVel = pin.pinVelocity;
+        CustomMathsLibrary.Vector3 pinVel = pin.GetPinVelocity();
 
         // Find the seperating velocity along the impact normal
         CustomMathsLibrary.Vector3 relativeVel = CustomMathsLibrary.Subtract(ballVel, pinVel);
@@ -423,10 +425,10 @@ public class BowlingBallController : MonoBehaviour
         float impulseScalar = (1f + restitution) * seperatingVel;
         impulseScalar /= (1f / ballMass) + (1f / pin.GetPinMass());
 
-        float normalizedCharge = Mathf.Clamp01(throwCharge / 0.75f); 
+        float normalizedCharge = CustomMathsLibrary.Clamp(throwCharge / 0.75f, 0, 1); 
 
         // Lerps it to an impulse boost
-        float impulseBoost = Mathf.Lerp(minImpulseBoost, maxImpulseBoost, normalizedCharge);
+        float impulseBoost = CustomMathsLibrary.Lerp(minImpulseBoost, maxImpulseBoost, normalizedCharge);
 
         impulseScalar *= impulseBoost;
 

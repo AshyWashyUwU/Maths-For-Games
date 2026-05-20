@@ -202,6 +202,7 @@ GameObject:
   m_Component:
   - component: {fileID: 44199041}
   - component: {fileID: 44199042}
+  - component: {fileID: 44199043}
   m_Layer: 0
   m_Name: Cameras
   m_TagString: Untagged
@@ -248,6 +249,18 @@ MonoBehaviour:
   - {fileID: 429173648}
   - {fileID: 1200319496}
   - {fileID: 1120540810}
+--- !u!114 &44199043
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 44199040}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 46b9e82b7c87a5042b56875d0340ae2c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::WorldVisualizer
 --- !u!1 &93320417
 GameObject:
   m_ObjectHideFlags: 0
@@ -1752,7 +1765,7 @@ MonoBehaviour:
   ballHoldMoveSpeed: 2
   ballRotateSpeed: 1
   ballMaxRotation: 45
-  ballChargeSpeed: 1.5
+  ballChargeSpeed: 3
   maxPullbackDistance: 0.25
   pullbackSmoothing: 5
   maxThrowForce: 2
@@ -1762,7 +1775,6 @@ MonoBehaviour:
   ballRadius: 0.5
   ballRollSpeed: 2
   ballMinRollSpeed: 2
-  verticalVelocity: 0
   minImpulseBoost: 5
   maxImpulseBoost: 15
 --- !u!23 &859261032
