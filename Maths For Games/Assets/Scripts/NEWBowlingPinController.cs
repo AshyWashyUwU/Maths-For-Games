@@ -1,6 +1,6 @@
 using UnityEngine;
 
-public class BowlingPinController : MonoBehaviour
+public class NEWBowlingPinController : MonoBehaviour
 {
     [Header("Pin Physical Variables")]
     [Range(0.25f, 1)] [SerializeField] private float pinRadius = 0.5f;
@@ -17,7 +17,7 @@ public class BowlingPinController : MonoBehaviour
 
     private float inertia; // Rotational resistance (mass distribution approximation)
 
-    private bool isGrounded; // True = pin is fully touching the ground
+    public bool isGrounded; // True = pin is fully touching the ground
     private bool hasFallen; // True = Pin has tipped past the threshold
     private bool hasCorrection; // External collision checker to check if correction needs to be applied
 
@@ -85,7 +85,6 @@ public class BowlingPinController : MonoBehaviour
         // 10. Push the final pos to the transform (ApplyTransform)
 
         // x = x + v * dt
-        pos = transform.position;
         pos = CustomMathsLibrary.Add(pos, CustomMathsLibrary.Scale(pinVelocity, Time.deltaTime));
 
         ApplyGravityTorque(ref pos);
@@ -103,6 +102,8 @@ public class BowlingPinController : MonoBehaviour
         if (hasCorrection) ApplyCollisionCorrection(ref pos);
 
         ApplyTransform(pos);
+
+        FinalGroundSnap(ref pos);
 
         DrawDebugs();
     }
@@ -145,32 +146,33 @@ public class BowlingPinController : MonoBehaviour
     // Applies gravity torque (tipping) to the pin to simulate falling over
     private void ApplyGravityTorque(ref CustomMathsLibrary.Vector3 pos)
     {
-        CustomMathsLibrary.Vector3 upDir = rotation.RotateVector(up);
+        bottomPoint = GetBottomPoint();
 
-        CustomMathsLibrary.Vector3 bottomWorld = CustomMathsLibrary.Subtract(pos, CustomMathsLibrary.Scale(upDir, (pinHeight * 0.5f)));
+        print(bottomPoint.y);
 
-        float groundY = hasFallen ? WorldData.worldGroundPos + pinRadius : WorldData.worldGroundPos;
+        float targetBottomPoint = hasFallen ? WorldData.worldGroundPos + pinRadius : WorldData.worldGroundPos + (pinRadius * 2);
 
-        isGrounded = bottomWorld.y <= groundY;
-
-        if (isGrounded)
+        // Ground collision
+        if (bottomPoint.y <= targetBottomPoint)
         {
-            float penetration = groundY - bottomWorld.y;
-            pos.y += penetration;
+            if (pinVelocity.y < 0) pinVelocity.y = 0f;
 
-            if (pinVelocity.y < 0f) pinVelocity.y = 0f;
+            isGrounded = true;
         }
         else
         {
+            isGrounded = false;
+
             pinVelocity.y += CustomPhysicsLibrary.CaculateObjectGravityForce(pinMass) * Time.deltaTime;
         }
-
 
         if (!isGrounded || hasFallen) return;
 
         CustomMathsLibrary.Vector3 worldUp = new CustomMathsLibrary.Vector3(0, 1, 0);
 
-        CustomMathsLibrary.Vector3 tiltAxis = CustomMathsLibrary.CrossProduct(upDir, worldUp);
+        CustomMathsLibrary.Vector3 pinUp = GetUpDir();
+
+        CustomMathsLibrary.Vector3 tiltAxis = CustomMathsLibrary.CrossProduct(pinUp, worldUp);
 
         float tiltAmount = CustomMathsLibrary.Magnitude(tiltAxis);
 
@@ -179,27 +181,30 @@ public class BowlingPinController : MonoBehaviour
         tiltAxis = CustomMathsLibrary.Normalize(tiltAxis);
 
         // Artificial gravity strength tipping
-        float gravityTorqueStrength = pinMass * 35f * tiltAmount;
+        float gravityTorqueStrength = pinMass * 12.5f * tiltAmount;
 
         CustomMathsLibrary.Vector3 gravityTorque = CustomMathsLibrary.Scale(tiltAxis, gravityTorqueStrength);
 
         // Angular acceleration
         CustomMathsLibrary.Vector3 angularAccel = CustomMathsLibrary.Scale(gravityTorque, 1f / inertia);
 
-        float wobbleDamping = 0.98f;
-        angularVelocity = CustomMathsLibrary.Scale(angularVelocity, wobbleDamping);
-
         // Apply velocity
-        angularVelocity = CustomMathsLibrary.Add(angularVelocity, CustomMathsLibrary.Scale(angularAccel, Time.deltaTime));
+        angularVelocity =CustomMathsLibrary.Add(angularVelocity, CustomMathsLibrary.Scale(angularAccel, Time.deltaTime));
+
+        // Sleep threshold
+        if (CustomMathsLibrary.Magnitude(angularVelocity) < 0.05f)
+        {
+            angularVelocity = CustomMathsLibrary.Vector3.zero;
+        }
     }
 
     // Prevents the pin from sliding / snapping depending on if it's grounded or not; more fake physics
     private void ApplyDamping()
     {
-        float linearDamping = isGrounded ? 0.8f : 0.99f;
+        float linearDamping = isGrounded ? 0.95f : 0.99f;
         pinVelocity = CustomMathsLibrary.Scale(pinVelocity, linearDamping);
 
-        float angularDamping = isGrounded ? 0.65f : 0.95f;
+        float angularDamping = isGrounded ? 0.85f : 0.95f;
         angularVelocity = CustomMathsLibrary.Scale(angularVelocity, angularDamping);
     }
 
@@ -212,7 +217,7 @@ public class BowlingPinController : MonoBehaviour
         float uprightDot = CustomMathsLibrary.Dot(GetUpDir(), up);
 
         // Decided whether or not the pin has fallen so it can snap the rotation later
-        if (!hasFallen && uprightDot < 0)
+        if (!hasFallen && uprightDot < 0.95f)
         {
             hasFallen = true;
 
@@ -223,51 +228,42 @@ public class BowlingPinController : MonoBehaviour
         }
     }
 
-    private CustomMathsLibrary.Vector3 GetBottomAnchor(CustomMathsLibrary.Vector3 pos, CustomMathsLibrary.Quat rot)
-    {
-        CustomMathsLibrary.Vector3 upDir = rot.RotateVector(up);
-        return CustomMathsLibrary.Subtract(pos, CustomMathsLibrary.Scale(upDir, pinHeight * 0.5f - pinRadius));
-    }
-
     // Quaternion intergration - turns the velocity into actual rotation
     private void ApplyAngularRotation()
     {
         float angularSpeed = CustomMathsLibrary.Magnitude(angularVelocity);
 
-        if (angularSpeed <= 0.000001f)
-            return;
+        if (angularSpeed > 0f)
+        {
+            CustomMathsLibrary.Vector3 axis = CustomMathsLibrary.Normalize(angularVelocity);
+            float angle = Mathf.Min(angularSpeed * Time.deltaTime, 0.1f);
 
-        CustomMathsLibrary.Vector3 axis = CustomMathsLibrary.Normalize(angularVelocity);
-        float angle = angularSpeed * Time.deltaTime;
+            CustomMathsLibrary.Quat deltaRot = new CustomMathsLibrary.Quat(axis, angle);
 
-        CustomMathsLibrary.Quat deltaRot = new CustomMathsLibrary.Quat(axis, angle);
+            CustomMathsLibrary.Vector3 pivot = GetBottomPoint();
 
-        // current bottom BEFORE rotation
-        CustomMathsLibrary.Vector3 oldBottom = GetBottomPoint();
+            rotation = deltaRot * rotation;
 
-        // apply rotation
-        rotation = deltaRot * rotation;
+            CustomMathsLibrary.Vector3 newBottom = GetBottomPoint();
 
-        // recompute bottom AFTER rotation
-        CustomMathsLibrary.Vector3 newBottom = GetBottomPoint();
+            CustomMathsLibrary.Vector3 correction = CustomMathsLibrary.Subtract(pivot, newBottom);
 
-        // shift position so bottom stays fixed (THIS is the key)
-        pos = CustomMathsLibrary.Add(pos,
-            CustomMathsLibrary.Subtract(oldBottom, newBottom)
-        );
+            pos = CustomMathsLibrary.Add(pos, correction);
+        }
     }
 
     // Corrects the position so that the geometry of the pin stays consistent; preventing floating due to the rotation drift
     // Esentially tried to ground the pin to the bottom point of the lane
     private void CorrectPosition(ref CustomMathsLibrary.Vector3 pos)
     {
-        if (!isGrounded) return;
+        CustomMathsLibrary.Vector3 currentBottom = GetBottomPoint();
 
-        CustomMathsLibrary.Vector3 newUp = rotation.RotateVector(up);
+        float penetration = WorldData.worldGroundPos - currentBottom.y;
 
-        CustomMathsLibrary.Vector3 currentBottom = CustomMathsLibrary.Subtract(pos, CustomMathsLibrary.Scale(newUp, ((pinHeight * 0.5f) - pinRadius)));
-
-        pos = CustomMathsLibrary.Add(currentBottom, CustomMathsLibrary.Scale(newUp, (pinHeight * 0.5f) - pinRadius));
+        if (penetration > 0f)
+        {
+            pos.y += penetration;
+        }
     }
 
     // Applies constraints to the pin to stop it from going outside of the lane
@@ -305,6 +301,24 @@ public class BowlingPinController : MonoBehaviour
     {
         transform.position = pos;
         transform.rotation = rotation.ToUnityQuaternion();
+    }
+
+    private void FinalGroundSnap(ref CustomMathsLibrary.Vector3 pos)
+    {
+        CustomMathsLibrary.Vector3 finalBottom = GetBottomPoint();
+
+        float targetGround = WorldData.worldGroundPos + pinRadius;
+
+        float penetration = targetGround - finalBottom.y;
+
+        if (Mathf.Abs(penetration) > 0.0001f)
+        {
+            pos.y += penetration;
+        }
+
+        finalBottom = GetBottomPoint();
+
+        isGrounded = Mathf.Abs(finalBottom.y - targetGround) < 0.01f;
     }
 
     private void DrawDebugs()

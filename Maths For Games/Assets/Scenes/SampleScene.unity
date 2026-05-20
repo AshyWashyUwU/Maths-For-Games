@@ -1764,7 +1764,7 @@ MonoBehaviour:
   ballMinRollSpeed: 2
   verticalVelocity: 0
   minImpulseBoost: 5
-  maxImpulseBoost: 25
+  maxImpulseBoost: 15
 --- !u!23 &859261032
 MeshRenderer:
   m_ObjectHideFlags: 0

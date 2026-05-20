@@ -36,7 +36,7 @@ public class BowlingBallController : MonoBehaviour
     [Range(1, 5)]    [SerializeField] private float ballRollSpeed = 1.5f; // The ball's speed (based on forward)
     [Range(1, 5)]    [SerializeField] private float ballMinRollSpeed = 1.5f; // Prevents the ball from stopping entirely / going backwards (used to prevent softlock)
 
-    public float verticalVelocity; // The velocity of the ball (affected by gravity)
+    private float verticalVelocity; // The velocity of the ball (affected by gravity)
     private float hookDirection; // Stored left/right curve of the ball
     private float elapsedRollingTime; // The total time the ball has been rolling since being released
 
@@ -380,14 +380,19 @@ public class BowlingBallController : MonoBehaviour
     // Performs a sphere to capsule collision check between the ball and pin using the CollisionUtlity class, returns try if a collision occurs
     private bool CheckCollision(CustomMathsLibrary.Vector3 ballPos, float ballRadius, BowlingPinController pin, out CustomMathsLibrary.Vector3 normal, out float penetration, out CustomMathsLibrary.Vector3 hitPoint)
     {
-        return CollisionUtility.SphereCapsuleCollision(ballPos, ballRadius, pin.GetBottom(), pin.GetTop(), pin.GetPinRadius(), out normal, out penetration, out hitPoint);
+        return CollisionUtility.SphereCapsuleCollision(ballPos, ballRadius, pin.GetBottomPoint(), pin.GetTopPoint(), pin.GetPinRadius(), out normal, out penetration, out hitPoint);
     }
 
     // Pushes the ball outside of the pin by moving along the collision normal by the penetration depth
     private void ApplyBallPenetration(ref CustomMathsLibrary.Vector3 ballPos, CustomMathsLibrary.Vector3 normal, float penetration)
     {
         // Makes sure the ball doesn't clip into the pin
-        ballPos = CustomMathsLibrary.Add(ballPos, CustomMathsLibrary.Scale(normal, penetration));
+        CustomMathsLibrary.Vector3 correction = CustomMathsLibrary.Scale(normal, penetration);
+
+        // Prevent pushing ball into the ground
+        if (correction.y < 0f) correction.y = 0f;
+
+        ballPos = CustomMathsLibrary.Add(ballPos, correction);
     }
 
     // Compute a normalized dot product between ball movement and collision normal

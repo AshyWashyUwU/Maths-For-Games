@@ -24,7 +24,7 @@ public class PinCollisionManager : MonoBehaviour
                 BowlingPinController pinA = pins[i];
                 BowlingPinController pinB = pins[j];
 
-                if (!CollisionUtility.CapsuleCapsuleCollision(pinA.GetBottom(), pinA.GetTop(), pinA.GetPinRadius(), pinB.GetBottom(), pinB.GetTop(), pinB.GetPinRadius(), out CustomMathsLibrary.Vector3 normal, out float penetration, out CustomMathsLibrary.Vector3 hitPoint)) continue;
+                if (!CollisionUtility.CapsuleCapsuleCollision(pinA.GetBottomPoint(), pinA.GetTopPoint(), pinA.GetPinRadius(), pinB.GetBottomPoint(), pinB.GetTopPoint(), pinB.GetPinRadius(), out CustomMathsLibrary.Vector3 normal, out float penetration, out CustomMathsLibrary.Vector3 hitPoint)) continue;
 
                 ResolvePinPenetration(pinA, pinB, normal, penetration);
                 ApplyPinImpulse(pinA, pinB, normal, hitPoint);
