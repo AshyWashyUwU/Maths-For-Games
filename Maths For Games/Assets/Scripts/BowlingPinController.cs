@@ -8,7 +8,7 @@ public class BowlingPinController : MonoBehaviour
     [Range(0.25f, 1f)] [SerializeField] private float pinRadius = 0.5f; // The "size" of the pin which is used for collisions / rotation
     [Range(0.5f, 2f)]  [SerializeField] private float pinHeight = 2f; // The "height" of the pin which is used mainly for tipping and the points between two radii
     [Range(1f, 5f)]    [SerializeField] private float pinMass = 2f; // The "weight" of the pin which affects gravity force, drag, collisions and how quickly the pin falls over
-    [Range(0f, 1f)]    [SerializeField] private float fallThreshold = 0f; // The threshold at which the pin rotates enough to tilt over (used by a dot product)
+    [Range(0f, 1f)]    [SerializeField] private float fallThreshold = 0.95f; // The threshold at which the pin rotates enough to tilt over (used by a dot product)
 
     private CustomMathsLibrary.Vector3 pinVelocity = CustomMathsLibrary.Vector3.zero; // Linear velocity of the pin
     private CustomMathsLibrary.Vector3 angularVelocity = CustomMathsLibrary.Vector3.zero; // Spin / tilt rate of the pin

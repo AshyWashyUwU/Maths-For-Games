@@ -411,8 +411,8 @@ public static class CustomMathsLibrary
     }
 
     // 1. Represent each segment as a parametric line
-    // 2. Compute direction and offset vectors
-    // 3. Compute dot products to project vectors and measure alignment
+    // 2. Caculate direction and offset vectors
+    // 3. Caculate dot products to project vectors and measure alignment
     // 4. Solve for initial parameters f and g that minimize distance
     // 5. Clamp g to [0, 1] and adjust f if necessary
     // 6. Compute the final closest points in 3D space
