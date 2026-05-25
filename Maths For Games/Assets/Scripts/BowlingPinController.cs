@@ -9,6 +9,7 @@ public class BowlingPinController : MonoBehaviour
     [Range(0.5f, 2f)]  [SerializeField] private float pinHeight = 2f; // The "height" of the pin which is used mainly for tipping and the points between two radii
     [Range(1f, 5f)]    [SerializeField] private float pinMass = 2f; // The "weight" of the pin which affects gravity force, drag, collisions and how quickly the pin falls over
     [Range(0f, 1f)]    [SerializeField] private float fallThreshold = 0.95f; // The threshold at which the pin rotates enough to tilt over (used by a dot product)
+    [Range(0f, 1f)]    [SerializeField] private float rotationalResistance = 0.8f; // Rotational resistance
 
     private CustomMathsLibrary.Vector3 pinVelocity = CustomMathsLibrary.Vector3.zero; // Linear velocity of the pin
     private CustomMathsLibrary.Vector3 angularVelocity = CustomMathsLibrary.Vector3.zero; // Spin / tilt rate of the pin
@@ -18,8 +19,6 @@ public class BowlingPinController : MonoBehaviour
     private CustomMathsLibrary.Vector3 up = new CustomMathsLibrary.Vector3(0, 1, 0); // World up
 
     private CustomMathsLibrary.Quat currentRotation = new CustomMathsLibrary.Quat(1, 0, 0, 0); // Current orientation of the pin (custom quat)
-
-    private float inertia; // Rotational resistance (fake physicsy mass distribution approximation)
 
     private CustomMathsLibrary.Quat finalRotation; // Stored final rotation of the pin
     private CustomMathsLibrary.Vector3 startPosition; // Stored start position of the pin
@@ -64,8 +63,6 @@ public class BowlingPinController : MonoBehaviour
 
         pinVelocity = CustomMathsLibrary.Vector3.zero;
         angularVelocity = CustomMathsLibrary.Vector3.zero;
-
-        inertia = (1f / 12f) * pinMass * (3 * pinRadius * pinRadius + pinHeight * pinHeight); // Computes moment of intertia for the pin (which is a cylinder-like object)
     }
 
     private void FixedUpdate()
@@ -126,7 +123,7 @@ public class BowlingPinController : MonoBehaviour
         CustomMathsLibrary.Vector3 torque = CustomMathsLibrary.CrossProduct(r, impulse);
 
         // Converts torque into angular acceleration (angularAccel)
-        CustomMathsLibrary.Vector3 angularAccel = CustomMathsLibrary.Scale(torque, 1f / inertia);
+        CustomMathsLibrary.Vector3 angularAccel = CustomMathsLibrary.Scale(torque, 1f / rotationalResistance);
 
         if (angularAccel.x < 0)
         {
@@ -176,7 +173,7 @@ public class BowlingPinController : MonoBehaviour
         CustomMathsLibrary.Vector3 gravityTorque = CustomMathsLibrary.Scale(tiltAxis, gravityTorqueStrength);
 
         // Angular acceleration
-        CustomMathsLibrary.Vector3 angularAccel = CustomMathsLibrary.Scale(gravityTorque, 1f / inertia);
+        CustomMathsLibrary.Vector3 angularAccel = CustomMathsLibrary.Scale(gravityTorque, 1f / rotationalResistance);
 
         // Additional fake dampening
         angularVelocity = CustomMathsLibrary.Scale(angularVelocity, 0.995f);
